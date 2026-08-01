@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-brand: #FFB800; /* Warm amber accent */
+  --color-brand-light: #FFC933;
+  --color-charcoal-dark: #0F0F12; /* Deep charcoal background */
+  --color-charcoal-card: #18181F; /* Premium dark SaaS cards */
+  --color-charcoal-border: #23232A; /* Subtle SaaS borders */
+  --color-charcoal-hover: #1E1E26;
+}
+
+/* Custom background styling blending modern gradients and grain */
+body {
+  background-color: #0F0F12;
+  background-image:
+    radial-gradient(ellipse 800px 400px at 50% -10%, rgba(255, 184, 0, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 900px 500px at 85% 100%, rgba(255, 184, 0, 0.02) 0%, transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  background-blend-mode: normal, normal, overlay;
+  background-attachment: fixed;
+  color: #E4E4E7;
+  font-family: var(--font-sans);
+}
+
+/* Hide webkit scrollbars for premium horizontal scrolling */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Glassmorphic effect helper */
+.glass-nav {
+  backdrop-filter: blur(16px);
+  background: rgba(22, 22, 28, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* Custom transitions and glow */
+.brand-glow {
+  text-shadow: 0 0 10px rgba(255, 184, 0, 0.25);
+}
+
+.brand-ring-glow {
+  box-shadow: 0 0 15px rgba(255, 184, 0, 0.15);
+}
+
+/* Typewriter animation pulse for blinking active character */
+@keyframes blink {
+  50% { opacity: 0; }
+}
+.animate-cursor-blink {
+  animation: blink 1s step-end infinite;
+}
+
+.typing-area {
+  height: 45vh;
+  min-height: 250px;
+  max-height: 50vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  .typing-area {
+    height: 35vh;
+    min-height: 180px;
+    max-height: 40vh;
+  }
+}
+

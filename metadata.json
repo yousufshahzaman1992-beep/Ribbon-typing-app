@@ -1,0 +1,6 @@
+{
+  "name": "Ribbon Typing Coach",
+  "description": "An adaptive, keyboard-focused typing coach featuring progressive lessons, customizable practice modes (English & Hindi), real-time accuracy and WPM tracking, a visual weak-key heatmap, certificate generation, and typing telemetry analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
