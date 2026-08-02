@@ -3953,42 +3953,8 @@ export default function App() {
           <div className="xl:hidden w-full overflow-hidden max-w-full bg-[#1F2833]/15 border-b border-zinc-900/40 px-4 md:px-6 py-1.5 flex flex-col gap-1.5 text-xs font-mono select-none backdrop-blur-sm z-10 shadow-sm shrink-0 mobile-settings-bar">
             {/* Top Row: DURATION (left) and MODES (right) */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-2 w-full">
-              {/* Left side: Script Selector & Duration Row */}
+              {/* Left side: Duration Row */}
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-center md:justify-start">
-                {/* SCRIPT SELECTOR */}
-                <div className="flex flex-wrap gap-1 py-0.5 shrink-0 justify-center md:justify-start mobile-pill-wrapper" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
-                  <span className="text-[8px] md:text-[9px] sm:md:text-[10px] text-zinc-500 font-bold uppercase tracking-wider shrink-0">LANG:</span>
-                  <div className="flex flex-wrap gap-1 bg-[#0B0C10]/60 p-0.5 rounded-full border border-zinc-850 shrink-0 mobile-pill-wrapper" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
-                    <button
-                      onClick={() => {
-                        setCurrentScript('english');
-                        sfx.playClick();
-                      }}
-                      className={`mobile-pill px-2 py-0.5 text-[8px] md:text-[9px] sm:md:text-[10px] font-mono font-black rounded-full transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                        currentScript === 'english'
-                          ? 'bg-[#00F0FF]/15 text-[#00F0FF] font-black'
-                          : 'text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      EN
-                    </button>
-                    <span className="text-zinc-700 text-[8px] md:text-[9px] select-none mx-0.5">|</span>
-                    <button
-                      onClick={() => {
-                        setCurrentScript('hindi');
-                        sfx.playClick();
-                      }}
-                      className={`mobile-pill px-2 py-0.5 text-[8px] md:text-[9px] sm:md:text-[10px] font-mono font-black rounded-full transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                        currentScript === 'hindi'
-                          ? 'bg-[#FF6B35]/15 text-[#FF6B35] font-black'
-                          : 'text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      HI
-                    </button>
-                  </div>
-                </div>
-
                 {/* Left side: Duration Row (Horizontal pills with separator lines) */}
                 <div className="flex flex-wrap gap-1 py-0.5 shrink-0 justify-center md:justify-start mobile-pill-wrapper" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
                   <span className="text-[8px] md:text-[9px] sm:md:text-[10px] text-zinc-500 font-bold uppercase tracking-wider shrink-0">DURATION:</span>
@@ -4930,36 +4896,6 @@ export default function App() {
                 <div className="flex items-center gap-1.5 bg-[#0B0C10]/60 border border-zinc-850 px-3 py-1 rounded-[12px] text-xs font-mono font-bold text-[#FF6B35] shadow-[0_0_10px_rgba(255,107,53,0.1)]">
                   <span>🔥</span>
                   <span>{streak} Day Streak</span>
-                </div>
-
-                {/* Script Selector */}
-                <div className="flex items-center bg-[#0B0C10]/60 border border-zinc-850 p-0.5 rounded-[12px] text-xs font-mono font-bold">
-                  <button
-                    onClick={() => {
-                      setCurrentScript('english');
-                      sfx.playClick();
-                    }}
-                    className={`px-3 py-1 text-[10px] font-mono font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
-                      currentScript === 'english'
-                        ? 'bg-[#00F0FF]/15 text-[#00F0FF] font-bold'
-                        : 'text-zinc-500 hover:text-zinc-300'
-                    }`}
-                  >
-                    English
-                  </button>
-                  <button
-                    onClick={() => {
-                      setCurrentScript('hindi');
-                      sfx.playClick();
-                    }}
-                    className={`px-3 py-1 text-[10px] font-mono font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
-                      currentScript === 'hindi'
-                        ? 'bg-[#FF6B35]/15 text-[#FF6B35] font-bold'
-                        : 'text-zinc-500 hover:text-zinc-300'
-                    }`}
-                  >
-                    Hindi
-                  </button>
                 </div>
               </div>
 
