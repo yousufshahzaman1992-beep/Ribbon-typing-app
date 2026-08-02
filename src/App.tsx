@@ -48,6 +48,7 @@ import { LESSONS } from './data';
 import { STORIES_LIT1 } from './stories_lit1';
 import { PASSAGES } from './passages';
 import { Lesson, SessionHistoryItem } from './types';
+import { generateStory, generateText } from './lib/llmProvider';
 
 // Web Audio API Sound Synthesizer for tactile mechanical clacks
 class MechanicalFeedback {
@@ -1243,17 +1244,33 @@ export default function App() {
 
       const topic = storyTopic || 'typing practice';
 
-      fetch('/api/generate-story', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, duration: storyDuration, script: currentScript }),
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (!data.story) return;
+      (async () => {
+        let newChunk = "";
+        try {
+          const res = await fetch('/api/generate-story', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic, duration: storyDuration, script: currentScript }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.story) newChunk = data.story;
+          }
+        } catch (err) {
+          // fallback below
+        }
 
+        if (!newChunk) {
+          try {
+            newChunk = await generateStory(`Continue the typing story about "${topic}" in ${currentScript === 'hindi' ? 'Hindi' : 'English'}.`, 150);
+          } catch (e) {
+            console.warn('[AutoAppend] Fallback story prefetch failed:', e);
+          }
+        }
+
+        if (newChunk) {
           const cleanExisting = (currentLessonRef.current.customText || '').replace(/\s+/g, ' ').trim();
-          const cleanNew = data.story.replace(/\s+/g, ' ').trim();
+          const cleanNew = newChunk.replace(/\s+/g, ' ').trim();
           const combinedText = cleanExisting + '\n\n' + cleanNew;
 
           const mergedLesson: Lesson = {
@@ -1267,13 +1284,10 @@ export default function App() {
           const nextParsed = getLessonStructure(mergedLesson);
           const nextFormatted = buildTargetTextFromStructure(nextParsed);
           setTargetText(nextFormatted);
-        })
-        .catch(err => {
-          console.warn('[AutoAppend] Failed to fetch next chunk:', err.message);
-        })
-        .finally(() => {
-          aiPrefetchInFlightRef.current = false;
-        });
+        }
+      })().finally(() => {
+        aiPrefetchInFlightRef.current = false;
+      });
     }
   }, [typedText.length, targetText, currentLesson.id, workoutCompleted, storyTopic, storyDuration, getLessonStructure, buildTargetTextFromStructure]);
 
@@ -2612,16 +2626,32 @@ export default function App() {
   const generateWeaknessDrill = async (bigram: string) => {
     setSentenceGenerating(true);
     try {
-      const res = await fetch("/api/generate-drill", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ bigram, script: currentScript }),
-      });
-      const data = await res.json();
-      if (data.drill) {
-        setWeaknessSentence(data.drill);
+      let drillText = "";
+      try {
+        const res = await fetch("/api/generate-drill", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ bigram, script: currentScript }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.drill) drillText = data.drill;
+        }
+      } catch (e) {
+        console.warn("Drill API unavailable, using fallback:", e);
+      }
+
+      if (!drillText) {
+        const prompt = currentScript === 'hindi'
+          ? `Create a short 25-word typing practice sentence in Hindi focused on character pair "${bigram}".`
+          : `Create a short 25-word typing practice sentence in English with high frequency of "${bigram}".`;
+        drillText = await generateText(prompt);
+      }
+
+      if (drillText) {
+        setWeaknessSentence(drillText);
       }
     } catch (err) {
       console.error("Failed to generate custom drill:", err);
@@ -2722,28 +2752,45 @@ export default function App() {
     setStoryGenerating(true);
     sfx.playClick();
     try {
-      const res = await fetch("/api/generate-story", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ topic: storyTopic, duration: storyDuration, script: currentScript }),
-      });
-      const data = await res.json();
-      if (data.story) {
+      let storyText = "";
+      try {
+        const res = await fetch("/api/generate-story", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ topic: storyTopic, duration: storyDuration, script: currentScript }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.story) storyText = data.story;
+        }
+      } catch (e) {
+        console.warn("Server API unavailable, using client LLM fallback:", e);
+      }
+
+      // Client-side fallback if server API is unavailable (e.g. static host like Netlify)
+      if (!storyText) {
+        const langPrompt = currentScript === 'hindi'
+          ? `Write a clean, inspiring story in Hindi (Devanagari script) about "${storyTopic}". Target duration: ${storyDuration} minutes typing test (~${storyDuration * 40} words). Do NOT use special symbols, smart quotes, or dashes.`
+          : `Write an engaging typing practice story about "${storyTopic}". Target length: ~${storyDuration * 40} words. Use clean standard punctuation only.`;
+        storyText = await generateStory(langPrompt, storyDuration * 40);
+      }
+
+      if (storyText) {
         const aiLesson: Lesson = {
           id: 9999,
           name: `🔮 AI Story: ${storyTopic} (${storyDuration}min)`,
           keys: null,
           desc: `${storyDuration}-minute AI story about "${storyTopic}"`,
-          customText: data.story
+          customText: storyText
         };
         // Reset auto-append guards for the fresh session
         aiPrefetchInFlightRef.current = false;
         aiPrefetchTriggeredAtRef.current = 0;
         setActiveAppMode('normal');
         setCurrentLesson(aiLesson);
-        setTargetText(data.story.replace(/\s+/g, ' ').trim());
+        setTargetText(storyText.replace(/\s+/g, ' ').trim());
         setTypedText("");
         setStartTime(null);
         setElapsed(0);
@@ -2931,23 +2978,39 @@ export default function App() {
       const fumblesArr = getTopFumbles().map(f => f.char);
       const bigramsArr = getTopSlowestBigrams().map(b => b.bigram);
       
-      const res = await fetch("/api/generate-smart-drill", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fumbles: fumblesArr, bigrams: bigramsArr, script: currentScript })
-      });
-      const data = await res.json();
-      if (data && data.drill) {
+      let drillText = "";
+      try {
+        const res = await fetch("/api/generate-smart-drill", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fumbles: fumblesArr, bigrams: bigramsArr, script: currentScript })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.drill) drillText = data.drill;
+        }
+      } catch (e) {
+        console.warn("Smart drill server API unavailable, using fallback:", e);
+      }
+
+      if (!drillText) {
+        const prompt = currentScript === 'hindi'
+          ? `Create a 40-word Hindi typing drill targeting key fumbles: [${fumblesArr.join(', ')}] and bigrams: [${bigramsArr.join(', ')}].`
+          : `Create a 40-word English typing drill targeting key fumbles: [${fumblesArr.join(', ')}] and bigrams: [${bigramsArr.join(', ')}].`;
+        drillText = await generateText(prompt);
+      }
+
+      if (drillText) {
         const drillLesson: Lesson = {
           id: 8889,
           name: "🧠 Smart Weakness Drill",
           keys: null,
           desc: `Custom lesson targeting fumbles: ${fumblesArr.join(", ")} and bigrams: ${bigramsArr.join(", ")}`,
-          customText: data.drill
+          customText: drillText
         };
         setActiveAppMode('normal');
         setCurrentLesson(drillLesson);
-        setTargetText(data.drill.replace(/\s+/g, ' ').trim());
+        setTargetText(drillText.replace(/\s+/g, ' ').trim());
         setTypedText("");
         setStartTime(null);
         setElapsed(0);

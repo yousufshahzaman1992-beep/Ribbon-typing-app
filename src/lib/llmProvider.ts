@@ -123,6 +123,27 @@ function getState(providerName: string): RequestRecord {
 
 // ─── Key Resolution ───────────────────────────────────────────────────────────
 
+function getEnvVal(varName: string): string | undefined {
+  if (typeof process !== 'undefined' && process.env && process.env[varName]) {
+    return process.env[varName];
+  }
+  if (typeof process !== 'undefined' && process.env && process.env[`VITE_${varName}`]) {
+    return process.env[`VITE_${varName}`];
+  }
+  try {
+    const metaEnv = (import.meta as any).env;
+    if (metaEnv && metaEnv[varName]) {
+      return metaEnv[varName];
+    }
+    if (metaEnv && metaEnv[`VITE_${varName}`]) {
+      return metaEnv[`VITE_${varName}`];
+    }
+  } catch (e) {
+    // Ignore metaEnv errors in Node
+  }
+  return undefined;
+}
+
 /**
  * Returns all non-placeholder API keys for a provider, read from env vars.
  * Supports both comma-separated list vars and individual vars.
@@ -139,7 +160,7 @@ function resolveKeys(provider: ProviderConfig): string[] {
   const keys: string[] = [];
 
   for (const envVar of provider.envVars) {
-    const raw = process.env[envVar];
+    const raw = getEnvVal(envVar);
     if (!raw?.trim()) continue;
 
     for (const part of raw.split(",")) {
