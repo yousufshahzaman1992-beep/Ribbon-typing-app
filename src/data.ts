@@ -110,14 +110,15 @@ const ENGLISH_LESSONS: Lesson[] = [
     category: "Touch Typing Basics",
     customText: "A S D F J K L : A S D F J K L : Ask Dad For Jam; Ask Dad For Jam; Dad said: \"Keep practicing!\" Dad said: \"Keep practicing!\" Ask Dad For Jam; Dad said: \"Keep practicing!\" A S D F J K L : Ask Dad For Jam; Dad said: \"Keep practicing!\" Ask Dad For Jam; Dad said: \"Keep practicing!\""
   },
-  ...PRACTICE_STORIES.map((story) => {
+  ...PRACTICE_STORIES.map((story, index) => {
     const lessonId = story.id >= 100 ? story.id : story.id + 300;
     const cleanText = story.text.replace(/[*_]{3,}/g, '').replace(/[*_]+/g, '').trim();
+    const diffLabel = story.difficulty ? ` [${story.difficulty}]` : '';
     return {
       id: lessonId,
-      name: `Story ${story.id}: ${story.title}`,
+      name: `Story ${index + 1}: ${story.title}${diffLabel}`,
       keys: null,
-      desc: `By ${story.author} (${story.wordCount} words)`,
+      desc: `By ${story.author} (${story.wordCount} words) • ${story.difficulty || 'Medium'}`,
       category: "Practice Stories",
       customText: cleanText
     };
@@ -140,9 +141,9 @@ const ENGLISH_LESSONS: Lesson[] = [
   },
   {
     id: 202,
-    name: "Clerical Exam: Passage 3 (Administrative)",
+    name: "Clerical Exam: Passage 3 (Legal Brief)",
     keys: null,
-    desc: "Clerical screening test passage format. Backspace disabled.",
+    desc: "Formal court & legal terminology passage. Backspace disabled.",
     category: "Clerical Civil Exams",
     customText: EXAM_PASSAGES[2]
   }
@@ -229,14 +230,18 @@ const HINDI_LESSONS: Lesson[] = [
     category: "Practice Stories (Hindi)",
     customText: "एक कुत्ता मुंह में हड्डी का टुकड़ा दबाकर नदी के पुल से गुजर रहा था। नदी के साफ पानी में उसने अपनी ही परछाई देखी। उसने सोचा कि पानी में दूसरा कुत्ता है जिसके पास उससे भी बड़ा हड्डी का टुकड़ा है। उसने उस टुकड़े को भी पाने का लालच किया। जैसे ही उसने भौंकने के लिए अपना मुंह खोला, उसके मुंह का टुकड़ा पानी में गिर गया और बह गया। लालच के कारण उसने अपना भोजन भी खो दिया और भूखा रह गया। सीख: लालच का फल हमेशा बुरा होता है और जो कुछ हमारे पास है, हमें उसी में संतोष करना चाहिए।"
   },
-  ...HINDI_STORIES.map(story => ({
-    id: story.id,
-    name: `Story ${story.id - 599}: ${story.title}`,
-    keys: null,
-    desc: `${story.author} (${story.wordCount} शब्द)`,
-    category: "Practice Stories (Hindi)",
-    customText: story.text
-  })),
+  ...HINDI_STORIES.map((story, index) => {
+    const diffMap: Record<string, string> = { Easy: 'आसान', Medium: 'मध्यम', Hard: 'कठिन' };
+    const diffLabel = story.difficulty ? ` [${diffMap[story.difficulty] || story.difficulty}]` : '';
+    return {
+      id: story.id,
+      name: `Story ${index + 1}: ${story.title}${diffLabel}`,
+      keys: null,
+      desc: `${story.author} (${story.wordCount} शब्द) • ${diffMap[story.difficulty || 'Medium'] || story.difficulty}`,
+      category: "Practice Stories (Hindi)",
+      customText: story.text
+    };
+  }),
   {
     id: 700,
     name: "Hindi Clerical Exam: Passage 1 (Administrative)",
