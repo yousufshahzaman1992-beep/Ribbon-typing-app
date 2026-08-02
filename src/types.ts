@@ -67,6 +67,7 @@ export interface Story {
   author: string;
   text: string;
   wordCount: number;
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
 }
 
 export type TypingScript = 'english' | 'hindi';
