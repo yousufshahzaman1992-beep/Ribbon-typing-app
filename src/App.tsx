@@ -927,6 +927,11 @@ export default function App() {
     }
   }, [typedText, smartComposeEnabled, isPremium]);
 
+  // Exam Mode (disables backspace — simulates SSC/CHSL strict exam conditions)
+  const [examMode, setExamMode] = useState<boolean>(() => {
+    return localStorage.getItem('ribbon_exam_mode') === 'true';
+  });
+
   // Zen Mode, Weekly Challenges, and Smart Drills states
   const [zenMode, setZenMode] = useState<boolean>(false);
   const [weeklyChallengeOpen, setWeeklyChallengeOpen] = useState<boolean>(false);
@@ -1221,6 +1226,11 @@ export default function App() {
     setWorkoutStats(null);
     setAutoInsertedBrackets([]);
     setIsPaused(false);
+    // Reset scroll position so text always starts from the top on lesson load
+    requestAnimationFrame(() => {
+      if (containerRef.current) containerRef.current.scrollTop = 0;
+      if (mobileContainerRef.current) mobileContainerRef.current.scrollTop = 0;
+    });
   }, [derivedTargetText]);
 
   // ── AI Story Auto-Append ────────────────────────────────────────────────────
@@ -1308,6 +1318,7 @@ export default function App() {
   const activeModalRef = useRef(activeModal);
   const arcadeActiveRef = useRef(arcadeActive);
   const keyboardLayoutRef = useRef(keyboardLayout);
+  const examModeRef = useRef(examMode);
   const handleTypingKeyRef = useRef<(key: string, physicalCode?: string) => void>(() => {});
 
   // Keep refs in sync with state in a single consolidated useEffect to minimize commit phase overhead
@@ -1328,10 +1339,11 @@ export default function App() {
     activeModalRef.current = activeModal;
     arcadeActiveRef.current = arcadeActive;
     keyboardLayoutRef.current = keyboardLayout;
+    examModeRef.current = examMode;
   }, [
     typedText, targetText, currentLesson, autoInsertedBrackets, workoutCompleted,
     isPaused, timedEndModalOpen, freestyleMode, activeAppMode, startTime,
-    elapsed, testDuration, currentPassageIndex, activeModal, arcadeActive, keyboardLayout
+    elapsed, testDuration, currentPassageIndex, activeModal, arcadeActive, keyboardLayout, examMode
   ]);
 
   // Throttling references for scrolling engine
@@ -1355,26 +1367,34 @@ export default function App() {
         const activeChar = activeCharRef.current;
 
         if (activeChar && container) {
+          // Use getBoundingClientRect for accurate position relative to the scroll container
+          const charRect = activeChar.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          // charTop relative to the scroll container's visible top
+          const charTopRelative = charRect.top - containerRect.top;
+          // Desired scrollTop: keep the active char vertically centered in the container
+          const targetScroll = container.scrollTop + charTopRelative - (container.clientHeight / 2) + (charRect.height / 2);
+          const maxScroll = container.scrollHeight - container.clientHeight;
+          const clampedTarget = Math.max(0, Math.min(targetScroll, maxScroll));
+          const currentScroll = container.scrollTop;
+
+          // Update caret overlay using the same rect-based positions
           const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
           carets.forEach(caret => {
             caret.style.display = 'block';
-            caret.style.left = `${activeChar.offsetLeft}px`;
-            caret.style.top = `${activeChar.offsetTop}px`;
-            caret.style.width = `${activeChar.offsetWidth}px`;
-            caret.style.height = `${activeChar.offsetHeight}px`;
+            // Position caret relative to the container (which is position:relative)
+            caret.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
+            caret.style.top = `${clampedTarget !== currentScroll ? activeChar.offsetTop : charRect.top - containerRect.top + container.scrollTop}px`;
+            caret.style.width = `${charRect.width}px`;
+            caret.style.height = `${charRect.height}px`;
           });
 
           const suggestions = document.querySelectorAll('.custom-suggestion') as NodeListOf<HTMLDivElement>;
           suggestions.forEach(sug => {
             sug.style.display = 'flex';
-            sug.style.left = `${activeChar.offsetLeft}px`;
-            sug.style.top = `${activeChar.offsetTop - 24}px`;
+            sug.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
+            sug.style.top = `${(charRect.top - containerRect.top + container.scrollTop) - 24}px`;
           });
-
-          const targetScroll = activeChar.offsetTop - (container.clientHeight / 2) + (activeChar.offsetHeight / 2);
-          const maxScroll = container.scrollHeight - container.clientHeight;
-          const clampedTarget = Math.max(0, Math.min(targetScroll, maxScroll));
-          const currentScroll = container.scrollTop;
 
           writeRafIdRef.current = requestAnimationFrame(() => {
             if (Math.abs(currentScroll - clampedTarget) > 1) {
@@ -1452,11 +1472,12 @@ export default function App() {
           const activeChar = activeCharRef.current;
           
           if (container && activeChar) {
-            const sh = container.scrollHeight;
-            const ch = container.clientHeight;
-            
-            const targetScroll = activeChar.offsetTop - (ch / 2) + (activeChar.offsetHeight / 2);
-            const maxScroll = sh - ch;
+            // Use getBoundingClientRect to get position relative to scroll container
+            const charRect = activeChar.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            const charTopRelative = charRect.top - containerRect.top;
+            const targetScroll = container.scrollTop + charTopRelative - (container.clientHeight / 2) + (charRect.height / 2);
+            const maxScroll = container.scrollHeight - container.clientHeight;
             const clampedTarget = Math.max(0, Math.min(targetScroll, maxScroll));
             
             if (Math.abs(container.scrollTop - clampedTarget) > 1) {
@@ -1466,17 +1487,17 @@ export default function App() {
             const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
             carets.forEach(caret => {
               caret.style.display = 'block';
-              caret.style.left = `${activeChar.offsetLeft}px`;
-              caret.style.top = `${activeChar.offsetTop}px`;
-              caret.style.width = `${activeChar.offsetWidth}px`;
-              caret.style.height = `${activeChar.offsetHeight}px`;
+              caret.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
+              caret.style.top = `${charRect.top - containerRect.top + container.scrollTop}px`;
+              caret.style.width = `${charRect.width}px`;
+              caret.style.height = `${charRect.height}px`;
             });
 
             const suggestions = document.querySelectorAll('.custom-suggestion') as NodeListOf<HTMLDivElement>;
             suggestions.forEach(sug => {
               sug.style.display = 'flex';
-              sug.style.left = `${activeChar.offsetLeft}px`;
-              sug.style.top = `${activeChar.offsetTop - 24}px`;
+              sug.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
+              sug.style.top = `${(charRect.top - containerRect.top + container.scrollTop) - 24}px`;
             });
           }
         });
@@ -1975,11 +1996,8 @@ export default function App() {
       physicallyPressedKeysRef.current.add(e.key.toLowerCase());
       // Feature 1: record keydown time for hold-time calculation
       keyDownTimesRef.current[e.key] = Date.now();
-      // Reset backspace cluster if a non-backspace key starts
-      if (e.key !== 'Backspace') {
-        backspaceClusterRef.current = 0;
-        backspaceClusterStartRef.current = -1;
-      }
+      // Note: backspace cluster is reset inside handleTypingKey after persistence;
+      // resetting here too early would race with localStorage save.
     };
 
     const handlePhysKeyUp = (e: KeyboardEvent) => {
@@ -2039,8 +2057,15 @@ export default function App() {
         e.preventDefault();
         if (smartComposeEnabledRef.current && isPremiumRef.current && smartSuggestionRef.current) {
           const suggestion = smartSuggestionRef.current;
-          for (const char of suggestion) {
-            if (handleTypingKeyRef.current) handleTypingKeyRef.current(char);
+          const typed = typedTextRef.current;
+          const target = targetTextRef.current;
+          // Only accept if suggestion exactly matches the next expected chars in target
+          // — prevents fumble recording and exam-mode lockout on mismatched suggestions
+          const expected = target.slice(typed.length, typed.length + suggestion.length);
+          if (expected === suggestion) {
+            for (const char of suggestion) {
+              if (handleTypingKeyRef.current) handleTypingKeyRef.current(char);
+            }
           }
         }
         return;
@@ -2092,6 +2117,11 @@ export default function App() {
     }
 
     if (key === 'Backspace') {
+      // Exam Mode: block backspace entirely (simulates SSC strict exam)
+      if (examModeRef.current) {
+        sfx.playClick(true, false); // play error sound to indicate blocked
+        return;
+      }
       if (typedText.length > 0) {
         sfx.playClick(false, false);
         if (backspaceClusterRef.current === 0) {
@@ -2172,7 +2202,8 @@ export default function App() {
             ...prev,
             mistypedNewlineIndices: (() => {
               const next = new Set(prev.mistypedNewlineIndices);
-              next.add(typedText.length);
+              // Use prev.typedText.length — avoids stale closure from outer scope
+              next.add(prev.typedText.length);
               return next;
             })(),
           }));
@@ -2355,13 +2386,17 @@ export default function App() {
             }
           } else {
             // Standard/Unlimited mode: complete the lesson
-            const durationSec = elapsed > 0.5 ? elapsed : 0.5;
+            // Use real wall-clock duration to avoid stale elapsed ref (ticks every 250ms)
+            const nowTs = Date.now();
+            const startTs = startTimeRef.current || nowTs;
+            const durationSec = Math.max(0.5, (nowTs - startTs) / 1000);
             let correctsCount = 0;
             for (let i = 0; i < targetText.length; i++) {
               if (newTyped[i] === targetText[i]) correctsCount++;
             }
 
-            const accuracy = Math.round((correctsCount / targetText.length) * 100);
+            // Industry-standard: correct chars / total chars typed (matches timed mode formula)
+            const accuracy = newTyped.length > 0 ? Math.round((correctsCount / newTyped.length) * 100) : 100;
             const wpm = Math.round((newTyped.length / 5) / (durationSec / 60));
 
             if (botRaceActive || adaptiveBossActive) {
@@ -3068,6 +3103,14 @@ export default function App() {
     if (lesson.category && lesson.category.startsWith("Practice Stories")) {
       setSelectedStoryId(lesson.id);
     }
+    // Fully reset session state so stale typed text / completion state
+    // doesn't persist when switching to a lesson with identical text
+    setTypedText("");
+    setStartTime(null);
+    setElapsed(0);
+    setWorkoutCompleted(false);
+    setWorkoutStats(null);
+    keystrokeTimesRef.current = [];
     setActiveModal(null);
   };
 
@@ -3963,6 +4006,7 @@ export default function App() {
                     { label: "1M", value: 60 },
                     { label: "2M", value: 120 },
                     { label: "5M", value: 300 },
+                    { label: "10M", value: 600 },
                     { label: "15M", value: 900 },
                     { label: "Unlimited", value: null }
                   ].map((opt, idx) => (
@@ -4112,6 +4156,25 @@ export default function App() {
                   }`}
                 >
                   📝 Freestyle
+                </button>
+
+                {/* EXAM MODE TOGGLE */}
+                <button
+                  onClick={() => {
+                    const next = !examMode;
+                    setExamMode(next);
+                    localStorage.setItem('ribbon_exam_mode', next.toString());
+                    handleResetSession();
+                    sfx.playClick();
+                  }}
+                  className={`mobile-pill px-1.5 md:px-2.5 py-0.5 text-[8px] md:text-[9px] sm:md:text-[10px] font-mono font-black uppercase tracking-wider rounded-full border transition-all cursor-pointer whitespace-nowrap shrink-0 overflow-x-auto ${
+                    examMode
+                      ? 'bg-red-500/20 border-red-500/50 text-red-400 shadow-[0_0_8px_rgba(239,68,68,0.3)]'
+                      : 'bg-[#1F2833]/10 border-zinc-850 text-zinc-400 hover:text-zinc-200'
+                  }`}
+                  title={examMode ? 'Exam Mode ON — Backspace disabled (SSC/CHSL strict)' : 'Enable Exam Mode — disables backspace'}
+                >
+                  🏛️ Exam
                 </button>
 
                 {/* Profiles select as a beautiful rounded select pill - centers & places in new line on mobile/tablet */}
@@ -4489,7 +4552,7 @@ export default function App() {
               ? 'flex-1 h-auto min-h-[220px] max-h-none' 
               : 'h-[25vh] min-h-[140px] max-h-[35vh]'
             } 
-            md:h-[45vh] md:min-h-[300px] md:max-h-[50vh] w-full max-w-4xl flex flex-col justify-start items-center relative overflow-hidden bg-zinc-950/20 border border-zinc-900/40 rounded-[20px] p-3 md:p-6 mb-2
+            md:h-[45vh] md:min-h-[300px] md:max-h-[50vh] w-full max-w-4xl flex flex-col justify-start items-center relative bg-zinc-950/20 border border-zinc-900/40 rounded-[20px] p-3 md:p-6 mb-2
           `}>
             
             {/* Pause Screen Overlay */}
@@ -4967,6 +5030,7 @@ export default function App() {
                     { label: "1M", value: 60 },
                     { label: "2M", value: 120 },
                     { label: "5M", value: 300 },
+                    { label: "10M", value: 600 },
                     { label: "15M", value: 900 },
                     { label: "∞", value: null }
                   ].map((opt) => (
@@ -5099,6 +5163,25 @@ export default function App() {
                   }`}
                 >
                   ✍️ Freestyle
+                </button>
+
+                {/* EXAM MODE TOGGLE */}
+                <button
+                  onClick={() => {
+                    const next = !examMode;
+                    setExamMode(next);
+                    localStorage.setItem('ribbon_exam_mode', next.toString());
+                    handleResetSession();
+                    sfx.playClick();
+                  }}
+                  className={`px-3 py-1 text-[10px] font-mono font-black uppercase tracking-wider rounded-full border transition-all cursor-pointer whitespace-nowrap ${
+                    examMode
+                      ? 'bg-red-500/20 border-red-500/50 text-red-400 shadow-[0_0_8px_rgba(239,68,68,0.3)]'
+                      : 'bg-[#1F2833]/10 border-zinc-850 text-zinc-400 hover:text-zinc-200'
+                  }`}
+                  title={examMode ? 'Exam Mode ON — Backspace disabled (SSC/CHSL strict)' : 'Enable Exam Mode — disables backspace like SSC/CHSL exams'}
+                >
+                  🏛️ {examMode ? 'Exam ON' : 'Exam'}
                 </button>
 
                 {/* ZEN */}
@@ -5267,7 +5350,7 @@ export default function App() {
             )}
 
             {/* Typing Text Area – taking up the remaining height */}
-            <div className="flex-1 w-full flex flex-col justify-start items-center relative overflow-hidden bg-[#0B0C10]/40 border border-zinc-800/60 rounded-[20px] p-6 mb-4 min-h-[300px] shadow-[inset_0_0_40px_rgba(0,0,0,0.3)]">
+            <div className="flex-1 w-full flex flex-col justify-start items-center relative bg-[#0B0C10]/40 border border-zinc-800/60 rounded-[20px] p-6 mb-4 min-h-[300px] shadow-[inset_0_0_40px_rgba(0,0,0,0.3)] overflow-visible">
               
               {/* Pause Screen Overlay */}
               {isPaused && !workoutCompleted && !arcadeActive && (
@@ -5419,7 +5502,7 @@ export default function App() {
                   </div>
 
                   <div 
-                    ref={mobileContainerRef}
+                    ref={containerRef}
                     className="typing-area w-full flex-1 overflow-y-auto relative flex flex-col justify-start items-start select-none"
                   >
                     {freestyleMode ? (
