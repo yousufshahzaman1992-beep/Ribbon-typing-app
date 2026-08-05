@@ -1363,46 +1363,40 @@ export default function App() {
       if (writeRafIdRef.current !== null) cancelAnimationFrame(writeRafIdRef.current);
 
       measureRafIdRef.current = requestAnimationFrame(() => {
+        const container = getActiveContainer();
         const activeChar = activeCharRef.current;
 
-        if (activeChar) {
-          // Use scrollIntoView — the browser walks up the ancestor chain and scrolls
-          // whichever container is actually scrollable. This handles both:
-          //   • panel-visible mode (typing-area has fixed h-[25vh]/md:h-[45vh] and scrolls internally)
-          //   • panel-collapsed/wide mode (typing-area grows freely; the outer xl:hidden panel scrolls)
-          activeChar.scrollIntoView({ block: 'center', inline: 'nearest' });
+        if (activeChar && container) {
+          // offsetTop is relative to the typing-area (position:relative), giving the
+          // character's absolute position within the scrollable content.
+          // Target: keep active char at 33% from top — user sees typed text above
+          // and upcoming text below, text scrolls UP naturally as typing progresses.
+          const targetScroll = activeChar.offsetTop - Math.floor(container.clientHeight * 0.33);
+          const maxScroll = container.scrollHeight - container.clientHeight;
+          const clampedTarget = Math.max(0, Math.min(targetScroll, maxScroll));
 
-          // Update caret overlay position after scrollIntoView settles
+          // Update caret overlay
+          const charRect = activeChar.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
+          carets.forEach(caret => {
+            caret.style.display = 'block';
+            caret.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
+            caret.style.top = `${activeChar.offsetTop}px`;
+            caret.style.width = `${charRect.width}px`;
+            caret.style.height = `${charRect.height}px`;
+          });
+          const suggestions = document.querySelectorAll('.custom-suggestion') as NodeListOf<HTMLDivElement>;
+          suggestions.forEach(sug => {
+            sug.style.display = 'flex';
+            sug.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
+            sug.style.top = `${activeChar.offsetTop - 24}px`;
+          });
+
           writeRafIdRef.current = requestAnimationFrame(() => {
-            const char = activeCharRef.current;
-            if (!char) return;
-            const charRect = char.getBoundingClientRect();
-            const container = getActiveContainer();
-            const containerRect = container ? container.getBoundingClientRect() : null;
-
-            const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
-            carets.forEach(caret => {
-              if (containerRect) {
-                caret.style.display = 'block';
-                caret.style.left = `${charRect.left - containerRect.left + (container?.scrollLeft ?? 0)}px`;
-                caret.style.top = `${charRect.top - containerRect.top + (container?.scrollTop ?? 0)}px`;
-                caret.style.width = `${charRect.width}px`;
-                caret.style.height = `${charRect.height}px`;
-              } else {
-                caret.style.display = 'none';
-              }
-            });
-
-            const suggestions = document.querySelectorAll('.custom-suggestion') as NodeListOf<HTMLDivElement>;
-            suggestions.forEach(sug => {
-              if (containerRect) {
-                sug.style.display = 'flex';
-                sug.style.left = `${charRect.left - containerRect.left + (container?.scrollLeft ?? 0)}px`;
-                sug.style.top = `${charRect.top - containerRect.top + (container?.scrollTop ?? 0) - 24}px`;
-              } else {
-                sug.style.display = 'none';
-              }
-            });
+            if (Math.abs(container.scrollTop - clampedTarget) > 1) {
+              container.scrollTop = clampedTarget;
+            }
           });
         } else {
           const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
@@ -1467,35 +1461,30 @@ export default function App() {
     const triggerRecalc = () => {
       timeoutId = setTimeout(() => {
         rafId = requestAnimationFrame(() => {
+          const container = getActiveContainer();
           const activeChar = activeCharRef.current;
-          if (activeChar) {
-            activeChar.scrollIntoView({ block: 'center', inline: 'nearest' });
-
-            // Update caret overlay after scroll settles
+          if (activeChar && container) {
+            const targetScroll = activeChar.offsetTop - Math.floor(container.clientHeight * 0.33);
+            const maxScroll = container.scrollHeight - container.clientHeight;
+            const clampedTarget = Math.max(0, Math.min(targetScroll, maxScroll));
+            if (Math.abs(container.scrollTop - clampedTarget) > 1) {
+              container.scrollTop = clampedTarget;
+            }
             const charRect = activeChar.getBoundingClientRect();
-            const container = getActiveContainer();
-            const containerRect = container ? container.getBoundingClientRect() : null;
+            const containerRect = container.getBoundingClientRect();
             const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
             carets.forEach(caret => {
-              if (containerRect) {
-                caret.style.display = 'block';
-                caret.style.left = `${charRect.left - containerRect.left + (container?.scrollLeft ?? 0)}px`;
-                caret.style.top = `${charRect.top - containerRect.top + (container?.scrollTop ?? 0)}px`;
-                caret.style.width = `${charRect.width}px`;
-                caret.style.height = `${charRect.height}px`;
-              } else {
-                caret.style.display = 'none';
-              }
+              caret.style.display = 'block';
+              caret.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
+              caret.style.top = `${activeChar.offsetTop}px`;
+              caret.style.width = `${charRect.width}px`;
+              caret.style.height = `${charRect.height}px`;
             });
             const suggestions = document.querySelectorAll('.custom-suggestion') as NodeListOf<HTMLDivElement>;
             suggestions.forEach(sug => {
-              if (containerRect) {
-                sug.style.display = 'flex';
-                sug.style.left = `${charRect.left - containerRect.left + (container?.scrollLeft ?? 0)}px`;
-                sug.style.top = `${charRect.top - containerRect.top + (container?.scrollTop ?? 0) - 24}px`;
-              } else {
-                sug.style.display = 'none';
-              }
+              sug.style.display = 'flex';
+              sug.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
+              sug.style.top = `${activeChar.offsetTop - 24}px`;
             });
           }
         });
@@ -4547,10 +4536,10 @@ export default function App() {
           {/* B. THE STAR ELEMENT: THE TYPING TEXT AREA (With explicit min-height constraints to prevent overflow) */}
           <div className={`
             ${isPanelCollapsed 
-              ? 'flex-1 h-auto min-h-[220px] max-h-none' 
-              : 'h-[25vh] min-h-[140px] max-h-[35vh]'
+              ? 'flex-1 min-h-[220px] max-h-[65dvh] overflow-hidden' 
+              : 'h-[25vh] min-h-[140px] max-h-[35vh] overflow-hidden'
             } 
-            md:h-[45vh] md:min-h-[300px] md:max-h-[50vh] w-full max-w-4xl flex flex-col justify-start items-center relative bg-zinc-950/20 border border-zinc-900/40 rounded-[20px] p-3 md:p-6 mb-2
+            md:h-[45vh] md:min-h-[300px] md:max-h-[50vh] md:overflow-hidden w-full max-w-4xl flex flex-col justify-start items-center relative bg-zinc-950/20 border border-zinc-900/40 rounded-[20px] p-3 md:p-6 mb-2
           `}>
             
             {/* Pause Screen Overlay */}
