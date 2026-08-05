@@ -1363,53 +1363,52 @@ export default function App() {
       if (writeRafIdRef.current !== null) cancelAnimationFrame(writeRafIdRef.current);
 
       measureRafIdRef.current = requestAnimationFrame(() => {
-        const container = getActiveContainer();
         const activeChar = activeCharRef.current;
 
-        if (activeChar && container) {
-          // Use getBoundingClientRect for accurate position relative to the scroll container
-          const charRect = activeChar.getBoundingClientRect();
-          const containerRect = container.getBoundingClientRect();
-          // charTop relative to the scroll container's visible top
-          const charTopRelative = charRect.top - containerRect.top;
-          // Desired scrollTop: keep the active char vertically centered in the container
-          const targetScroll = container.scrollTop + charTopRelative - (container.clientHeight / 2) + (charRect.height / 2);
-          const maxScroll = container.scrollHeight - container.clientHeight;
-          const clampedTarget = Math.max(0, Math.min(targetScroll, maxScroll));
-          const currentScroll = container.scrollTop;
+        if (activeChar) {
+          // Use scrollIntoView — the browser walks up the ancestor chain and scrolls
+          // whichever container is actually scrollable. This handles both:
+          //   • panel-visible mode (typing-area has fixed h-[25vh]/md:h-[45vh] and scrolls internally)
+          //   • panel-collapsed/wide mode (typing-area grows freely; the outer xl:hidden panel scrolls)
+          activeChar.scrollIntoView({ block: 'center', inline: 'nearest' });
 
-          // Update caret overlay using the same rect-based positions
-          const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
-          carets.forEach(caret => {
-            caret.style.display = 'block';
-            // Position caret relative to the container (which is position:relative)
-            caret.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
-            caret.style.top = `${clampedTarget !== currentScroll ? activeChar.offsetTop : charRect.top - containerRect.top + container.scrollTop}px`;
-            caret.style.width = `${charRect.width}px`;
-            caret.style.height = `${charRect.height}px`;
-          });
-
-          const suggestions = document.querySelectorAll('.custom-suggestion') as NodeListOf<HTMLDivElement>;
-          suggestions.forEach(sug => {
-            sug.style.display = 'flex';
-            sug.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
-            sug.style.top = `${(charRect.top - containerRect.top + container.scrollTop) - 24}px`;
-          });
-
+          // Update caret overlay position after scrollIntoView settles
           writeRafIdRef.current = requestAnimationFrame(() => {
-            if (Math.abs(currentScroll - clampedTarget) > 1) {
-              container.scrollTop = clampedTarget;
-            }
+            const char = activeCharRef.current;
+            if (!char) return;
+            const charRect = char.getBoundingClientRect();
+            const container = getActiveContainer();
+            const containerRect = container ? container.getBoundingClientRect() : null;
+
+            const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
+            carets.forEach(caret => {
+              if (containerRect) {
+                caret.style.display = 'block';
+                caret.style.left = `${charRect.left - containerRect.left + (container?.scrollLeft ?? 0)}px`;
+                caret.style.top = `${charRect.top - containerRect.top + (container?.scrollTop ?? 0)}px`;
+                caret.style.width = `${charRect.width}px`;
+                caret.style.height = `${charRect.height}px`;
+              } else {
+                caret.style.display = 'none';
+              }
+            });
+
+            const suggestions = document.querySelectorAll('.custom-suggestion') as NodeListOf<HTMLDivElement>;
+            suggestions.forEach(sug => {
+              if (containerRect) {
+                sug.style.display = 'flex';
+                sug.style.left = `${charRect.left - containerRect.left + (container?.scrollLeft ?? 0)}px`;
+                sug.style.top = `${charRect.top - containerRect.top + (container?.scrollTop ?? 0) - 24}px`;
+              } else {
+                sug.style.display = 'none';
+              }
+            });
           });
         } else {
           const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
-          carets.forEach(caret => {
-            caret.style.display = 'none';
-          });
+          carets.forEach(caret => { caret.style.display = 'none'; });
           const suggestions = document.querySelectorAll('.custom-suggestion') as NodeListOf<HTMLDivElement>;
-          suggestions.forEach(sug => {
-            sug.style.display = 'none';
-          });
+          suggestions.forEach(sug => { sug.style.display = 'none'; });
         }
       });
     };
@@ -1468,36 +1467,35 @@ export default function App() {
     const triggerRecalc = () => {
       timeoutId = setTimeout(() => {
         rafId = requestAnimationFrame(() => {
-          const container = getActiveContainer();
           const activeChar = activeCharRef.current;
-          
-          if (container && activeChar) {
-            // Use getBoundingClientRect to get position relative to scroll container
+          if (activeChar) {
+            activeChar.scrollIntoView({ block: 'center', inline: 'nearest' });
+
+            // Update caret overlay after scroll settles
             const charRect = activeChar.getBoundingClientRect();
-            const containerRect = container.getBoundingClientRect();
-            const charTopRelative = charRect.top - containerRect.top;
-            const targetScroll = container.scrollTop + charTopRelative - (container.clientHeight / 2) + (charRect.height / 2);
-            const maxScroll = container.scrollHeight - container.clientHeight;
-            const clampedTarget = Math.max(0, Math.min(targetScroll, maxScroll));
-            
-            if (Math.abs(container.scrollTop - clampedTarget) > 1) {
-              container.scrollTop = clampedTarget;
-            }
-            
+            const container = getActiveContainer();
+            const containerRect = container ? container.getBoundingClientRect() : null;
             const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
             carets.forEach(caret => {
-              caret.style.display = 'block';
-              caret.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
-              caret.style.top = `${charRect.top - containerRect.top + container.scrollTop}px`;
-              caret.style.width = `${charRect.width}px`;
-              caret.style.height = `${charRect.height}px`;
+              if (containerRect) {
+                caret.style.display = 'block';
+                caret.style.left = `${charRect.left - containerRect.left + (container?.scrollLeft ?? 0)}px`;
+                caret.style.top = `${charRect.top - containerRect.top + (container?.scrollTop ?? 0)}px`;
+                caret.style.width = `${charRect.width}px`;
+                caret.style.height = `${charRect.height}px`;
+              } else {
+                caret.style.display = 'none';
+              }
             });
-
             const suggestions = document.querySelectorAll('.custom-suggestion') as NodeListOf<HTMLDivElement>;
             suggestions.forEach(sug => {
-              sug.style.display = 'flex';
-              sug.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
-              sug.style.top = `${(charRect.top - containerRect.top + container.scrollTop) - 24}px`;
+              if (containerRect) {
+                sug.style.display = 'flex';
+                sug.style.left = `${charRect.left - containerRect.left + (container?.scrollLeft ?? 0)}px`;
+                sug.style.top = `${charRect.top - containerRect.top + (container?.scrollTop ?? 0) - 24}px`;
+              } else {
+                sug.style.display = 'none';
+              }
             });
           }
         });
