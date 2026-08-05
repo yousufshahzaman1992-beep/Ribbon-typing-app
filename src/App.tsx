@@ -4796,9 +4796,10 @@ export default function App() {
                   </span>
                 </div>
 
-                {/* TYPING FOCUS AREA (Text wraps naturally like a novel, smooth auto-scroll on active character) */}
+                {/* TYPING FOCUS AREA — uses mobileContainerRef so getActiveContainer()
+                     correctly returns this element on mobile (containerRef = desktop panel) */}
                 <div 
-                  ref={containerRef}
+                  ref={mobileContainerRef}
                   className="typing-area w-full flex-1 xl:flex-none xl:h-[62vh] xl:max-h-[62vh] overflow-y-auto relative flex flex-col justify-start items-start select-none scroll-smooth"
                 >
                 {freestyleMode ? (
