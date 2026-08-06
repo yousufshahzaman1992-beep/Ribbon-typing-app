@@ -1371,7 +1371,9 @@ export default function App() {
           // character's absolute position within the scrollable content.
           // Target: keep active char at 33% from top — user sees typed text above
           // and upcoming text below, text scrolls UP naturally as typing progresses.
-          const targetScroll = activeChar.offsetTop - Math.floor(container.clientHeight * 0.33);
+          // Keep cursor at 15% from top — text scrolls up aggressively on each new line,
+          // showing plenty of upcoming text below the cursor (typing-tutor feel).
+          const targetScroll = activeChar.offsetTop - Math.floor(container.clientHeight * 0.15);
           const maxScroll = container.scrollHeight - container.clientHeight;
           const clampedTarget = Math.max(0, Math.min(targetScroll, maxScroll));
 
@@ -1464,7 +1466,7 @@ export default function App() {
           const container = getActiveContainer();
           const activeChar = activeCharRef.current;
           if (activeChar && container) {
-            const targetScroll = activeChar.offsetTop - Math.floor(container.clientHeight * 0.33);
+            const targetScroll = activeChar.offsetTop - Math.floor(container.clientHeight * 0.15);
             const maxScroll = container.scrollHeight - container.clientHeight;
             const clampedTarget = Math.max(0, Math.min(targetScroll, maxScroll));
             if (Math.abs(container.scrollTop - clampedTarget) > 1) {
