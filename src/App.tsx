@@ -4784,10 +4784,13 @@ export default function App() {
                 </div>
 
                 {/* TYPING FOCUS AREA — uses mobileContainerRef so getActiveContainer()
-                     correctly returns this element on mobile (containerRef = desktop panel) */}
+                     correctly returns this element on mobile (containerRef = desktop panel).
+                     min-h-0 is critical: without it flex min-height:auto makes the element
+                     expand to fit all content, so clientHeight===scrollHeight and scrollTop
+                     is always a no-op. min-h-0 lets flex constrain it to allocated space. */}
                 <div 
                   ref={mobileContainerRef}
-                  className="typing-area w-full flex-1 xl:flex-none xl:h-[62vh] xl:max-h-[62vh] overflow-y-auto relative flex flex-col justify-start items-start select-none scroll-smooth"
+                  className="typing-area w-full flex-1 min-h-0 xl:flex-none xl:h-[62vh] xl:max-h-[62vh] overflow-y-auto relative flex flex-col justify-start items-start select-none scroll-smooth"
                 >
                 {freestyleMode ? (
                   <div 
