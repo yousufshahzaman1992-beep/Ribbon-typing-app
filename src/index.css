@@ -1,32 +1,60 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
-@theme {
+:root {
+  /* Modern Dark Color Palette */
+  --bg-base: #0D0F1A;
+  --bg-surface: #141728;
+  --bg-elevated: #1E2240;
+  --accent-primary: #6C63FF;
+  --accent-secondary: #00D4AA;
+  --accent-danger: #FF4D6D;
+  --accent-gold: #FFD166;
+  --text-primary: #F0F2FF;
+  --text-muted: #8892B0;
+  --text-dim: #4A5070;
+  --border: #252A48;
+  --glow-primary: rgba(108, 99, 255, 0.25);
+
+  /* Typography */
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-devanagari: "Noto Sans Devanagari", sans-serif;
   
-  --color-brand: #FFB800; /* Warm amber accent */
-  --color-brand-light: #FFC933;
-  --color-charcoal-dark: #0F0F12; /* Deep charcoal background */
-  --color-charcoal-card: #18181F; /* Premium dark SaaS cards */
-  --color-charcoal-border: #23232A; /* Subtle SaaS borders */
-  --color-charcoal-hover: #1E1E26;
+  --color-brand: #6C63FF;
+  --color-brand-light: #8B85FF;
+  --color-charcoal-dark: #0D0F1A;
+  --color-charcoal-card: #141728;
+  --color-charcoal-border: #252A48;
+  --color-charcoal-hover: #1E2240;
 }
 
-/* Custom background styling blending modern gradients and grain */
+[data-theme="light"] {
+  --bg-base: #F5F6FF;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #EEF0FF;
+  --accent-primary: #5B52E8;
+  --accent-secondary: #00B894;
+  --text-primary: #1A1D2E;
+  --text-muted: #5A6080;
+  --text-dim: #BABDD8;
+  --border: #DDE0F0;
+  --glow-primary: rgba(91, 82, 232, 0.15);
+}
+
 body {
-  background-color: #0F0F12;
+  background-color: var(--bg-base);
   background-image:
-    radial-gradient(ellipse 800px 400px at 50% -10%, rgba(255, 184, 0, 0.04) 0%, transparent 60%),
-    radial-gradient(ellipse 900px 500px at 85% 100%, rgba(255, 184, 0, 0.02) 0%, transparent 55%),
+    radial-gradient(ellipse 800px 400px at 50% -10%, rgba(108, 99, 255, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 900px 500px at 85% 100%, rgba(0, 212, 170, 0.05) 0%, transparent 55%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
   background-blend-mode: normal, normal, overlay;
   background-attachment: fixed;
-  color: #E4E4E7;
+  color: var(--text-primary);
   font-family: var(--font-sans);
 }
 
-/* Hide webkit scrollbars for premium horizontal scrolling */
+/* Hide webkit scrollbars for smooth scrolling */
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
@@ -35,28 +63,51 @@ body {
   scrollbar-width: none;
 }
 
-/* Glassmorphic effect helper */
+/* Glassmorphism Navigation */
 .glass-nav {
   backdrop-filter: blur(16px);
-  background: rgba(22, 22, 28, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(20, 23, 40, 0.75);
+  border: 1px solid var(--border);
 }
 
-/* Custom transitions and glow */
+/* Glow effects */
 .brand-glow {
-  text-shadow: 0 0 10px rgba(255, 184, 0, 0.25);
+  text-shadow: 0 0 12px var(--glow-primary);
 }
 
 .brand-ring-glow {
-  box-shadow: 0 0 15px rgba(255, 184, 0, 0.15);
+  box-shadow: 0 0 20px var(--glow-primary);
 }
 
-/* Typewriter animation pulse for blinking active character */
-@keyframes blink {
-  50% { opacity: 0; }
+/* Keypress feedback animations */
+@keyframes pulseGlow {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+  100% { transform: scale(1); }
 }
-.animate-cursor-blink {
-  animation: blink 1s step-end infinite;
+
+.animate-keypress-pulse {
+  animation: pulseGlow 120ms ease-out;
+}
+
+/* Error flash border animation */
+@keyframes errorFlash {
+  0% { box-shadow: inset 0 0 20px rgba(255, 77, 109, 0.5); }
+  100% { box-shadow: inset 0 0 0 transparent; }
+}
+
+.error-flash {
+  animation: errorFlash 300ms ease-out;
+}
+
+/* Floating XP particle animation */
+@keyframes floatXp {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-30px) scale(1.2); }
+}
+
+.animate-float-xp {
+  animation: floatXp 600ms ease-out forwards;
 }
 
 .typing-area {
@@ -64,7 +115,13 @@ body {
   min-height: 250px;
   max-height: 50vh;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   position: relative;
+}
+
+.typing-area::-webkit-scrollbar {
+  display: none;
 }
 
 @media (max-width: 768px) {
@@ -75,3 +132,58 @@ body {
   }
 }
 
+/* Redesigned Compact Layout Utilities */
+.top-stats-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+}
+
+.stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: rgba(13, 15, 26, 0.7);
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.65rem;
+  border-radius: 8px;
+}
+
+.key-error-glow {
+  background: var(--accent-danger) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(255, 77, 109, 0.8) !important;
+  border-color: #ff4d6d !important;
+  transform: scale(1.06);
+}
+
+.rank-user {
+  background: linear-gradient(90deg, rgba(108, 99, 255, 0.25), rgba(0, 212, 170, 0.15)) !important;
+  border: 1px solid var(--accent-primary) !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 0 12px rgba(108, 99, 255, 0.3) !important;
+}
+
+.mode-scroll-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.mode-scroll-row::-webkit-scrollbar {
+  display: none;
+}

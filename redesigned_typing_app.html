@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TypingApp - Cyberpunk Touch Tutor & AI Story Generator</title>
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ==========================================================================
+       CYBERPUNK NEON COLOR PALETTE & VARIABLES
+       ========================================================================== */
+    :root {
+      --bg-color: #0A0E17;
+      --card-bg: rgba(255, 255, 255, 0.04);
+      --card-border: rgba(0, 229, 255, 0.15);
+      --card-blur: 20px;
+      
+      --accent-en: #00E5FF;
+      --accent-hi: #FF6B35;
+      --correct-green: #00FF88;
+      --error-red: #FF2255;
+      --text-primary: #E8EDF5;
+      --text-secondary: #8899AA;
+      --gold-glow: #FFD700;
+      
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      background-image: 
+        radial-gradient(circle at 20% 10%, rgba(0, 229, 255, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 80% 90%, rgba(255, 107, 53, 0.06) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(10, 14, 23, 0.8) 0%, #0A0E17 100%);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 1rem 1.5rem;
+      overflow-x: hidden;
+    }
+
+    /* ==========================================================================
+       1. TOP BAR (UNIFIED, LEAK-PROOF FLEX CONTAINER - ONLY 1 LANG TOGGLE)
+       ========================================================================== */
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      background: var(--card-bg);
+      backdrop-filter: blur(var(--card-blur));
+      -webkit-backdrop-filter: blur(var(--card-blur));
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 0.75rem 1.25rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 0 12px rgba(0, 229, 255, 0.05);
+      max-width: 100%;
+      overflow: hidden;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 1.25rem;
+      font-weight: 900;
+      color: var(--text-primary);
+      text-decoration: none;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-logo span {
+      background: linear-gradient(135deg, var(--accent-en), #8A2BE2);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .stats-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .stat-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(10, 14, 23, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 0.4rem 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+
+    .stat-pill.streak { border-color: rgba(255, 215, 0, 0.3); color: var(--gold-glow); }
+    .stat-pill.shield { border-color: rgba(255, 34, 85, 0.3); color: var(--error-red); }
+    .stat-pill.level { border-color: rgba(0, 229, 255, 0.3); color: var(--accent-en); }
+    .stat-pill.timer { border-color: rgba(0, 255, 136, 0.3); color: var(--correct-green); }
+
+    /* XP Progress Bar in Top Bar */
+    .xp-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(10, 14, 23, 0.85);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      border-radius: 10px;
+      padding: 0.4rem 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .xp-bar-track {
+      width: 60px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .xp-bar-fill {
+      width: 36%; /* 180/500 XP */
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-en), var(--correct-green));
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+
+    /* THE ONLY SINGLE LANGUAGE TOGGLE IN THE APP (TOP RIGHT) */
+    .lang-dropdown-select {
+      background: rgba(0, 229, 255, 0.1);
+      border: 1px solid var(--accent-en);
+      border-radius: 10px;
+      padding: 0.4rem 0.8rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: var(--accent-en);
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .lang-dropdown-select option {
+      background: #0A0E17;
+      color: var(--text-primary);
+    }
+
+    .lang-dropdown-select:hover {
+      background: rgba(0, 229, 255, 0.2);
+      box-shadow: 0 0 14px rgba(0, 229, 255, 0.4);
+    }
+
+    /* ==========================================================================
+       2. MAIN CONTAINER (SIDEBAR - CONTENT - SIDEBAR)
+       ========================================================================== */
+    .app-body {
+      display: grid;
+      grid-template-columns: 200px 1fr 240px;
+      gap: 1.25rem;
+      flex: 1;
+      align-items: start;
+    }
+
+    @media (max-width: 1100px) {
+      .app-body {
+        grid-template-columns: 180px 1fr;
+      }
+      .right-sidebar {
+        grid-column: span 2;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+    }
+
+    @media (max-width: 768px) {
+      .app-body {
+        grid-template-columns: 1fr;
+      }
+      .left-sidebar {
+        display: none;
+      }
+    }
+
+    /* Common Glassmorphism Card Styling */
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(var(--card-blur));
+      -webkit-backdrop-filter: blur(var(--card-blur));
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.25rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    /* ==========================================================================
+       3. LEFT SIDEBAR (NAV MENU)
+       ========================================================================== */
+    .left-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .nav-header {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 900;
+      color: var(--text-secondary);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+      padding-left: 0.5rem;
+    }
+
+    .nav-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .nav-item a {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: 12px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .nav-item.active a,
+    .nav-item a:hover {
+      color: var(--text-primary);
+      background: rgba(0, 229, 255, 0.08);
+      border: 1px solid rgba(0, 229, 255, 0.2);
+    }
+
+    .nav-item.active a {
+      color: var(--accent-en);
+      font-weight: 700;
+      box-shadow: inset 3px 0 0 var(--accent-en);
+    }
+
+    /* ==========================================================================
+       4. MAIN CONTENT AREA
+       ========================================================================== */
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    /* UNCLUTTERED PILL ROWS FOR DURATION & MODES */
+    .pill-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      background: rgba(10, 14, 23, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 14px;
+      padding: 0.75rem;
+    }
+
+    .pill-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: thin;
+    }
+
+    .pill-row-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 800;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      white-space: nowrap;
+      margin-right: 0.25rem;
+    }
+
+    .mode-pill {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-secondary);
+      padding: 0.35rem 0.8rem;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .mode-pill:hover, .mode-pill.active {
+      color: var(--text-primary);
+      background: rgba(0, 229, 255, 0.12);
+      border-color: var(--accent-en);
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.2);
+    }
+
+    .mode-pill.active {
+      color: var(--accent-en);
+      font-weight: 800;
+    }
+
+    /* Special AI Stories Mode Pill Styling */
+    .mode-pill.ai-stories-pill {
+      background: linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(0, 229, 255, 0.2));
+      border: 1px solid #8A2BE2;
+      color: #D8B4FE;
+    }
+
+    .mode-pill.ai-stories-pill.active,
+    .mode-pill.ai-stories-pill:hover {
+      background: linear-gradient(135deg, rgba(138, 43, 226, 0.4), rgba(0, 229, 255, 0.4));
+      color: #FFFFFF;
+      box-shadow: 0 0 16px rgba(138, 43, 226, 0.6);
+    }
+
+    /* Lesson Meta Header */
+    .lesson-meta-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-top: 0.25rem;
+    }
+
+    .lesson-title {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+    }
+
+    .btn-ai-gen {
+      background: linear-gradient(135deg, #8A2BE2, var(--accent-en));
+      border: none;
+      color: #FFFFFF;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding: 0.4rem 0.85rem;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      box-shadow: 0 0 12px rgba(138, 43, 226, 0.4);
+      transition: all 0.2s ease;
+    }
+
+    .btn-ai-gen:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 18px rgba(138, 43, 226, 0.7);
+    }
+
+    /* Clean Pre-filled Typing Area with Cursor */
+    .typing-box {
+      background: rgba(10, 14, 23, 0.75);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.75rem;
+      min-height: 180px;
+      font-family: var(--font-mono);
+      font-size: 1.25rem;
+      line-height: 1.9;
+      letter-spacing: 1px;
+      word-break: break-word;
+      white-space: pre-wrap;
+      user-select: none;
+      box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.6);
+      cursor: text;
+      outline: none;
+    }
+
+    .typing-box:focus {
+      border-color: rgba(0, 229, 255, 0.4);
+      box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.6), 0 0 16px rgba(0, 229, 255, 0.2);
+    }
+
+    .char-typed {
+      color: var(--correct-green);
+      text-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+    }
+
+    .char-current {
+      color: var(--text-primary);
+      position: relative;
+      background: rgba(0, 229, 255, 0.2);
+      border-bottom: 3px solid var(--accent-en);
+      border-radius: 2px;
+      animation: cursorBlink 1s infinite;
+    }
+
+    .char-current.error-flash {
+      background: rgba(255, 34, 85, 0.3);
+      border-bottom-color: var(--error-red);
+      animation: shake 0.2s ease-in-out;
+    }
+
+    @keyframes cursorBlink {
+      0%, 100% { border-color: var(--accent-en); box-shadow: 0 0 8px var(--accent-en); }
+      50% { border-color: transparent; box-shadow: none; }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+
+    .char-pending {
+      color: var(--text-secondary);
+      opacity: 0.6;
+    }
+
+    /* COMPACT SESSION TELEMETRY STATS BAR UNDER TYPING AREA */
+    .telemetry-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-around;
+      gap: 1rem;
+      background: rgba(10, 14, 23, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 0.6rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 800;
+    }
+
+    .telemetry-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .telemetry-val {
+      color: var(--accent-en);
+    }
+
+    /* Lesson Progress Bar Container */
+    .progress-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      font-weight: 700;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 10px;
+      background: rgba(10, 14, 23, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-en), #8A2BE2);
+      border-radius: 999px;
+      box-shadow: 0 0 12px var(--accent-en);
+      transition: width 0.2s ease;
+    }
+
+    /* Action Buttons */
+    .controls-row {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border-radius: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-en), #00B8D4);
+      color: #0A0E17;
+      box-shadow: 0 4px 15px rgba(0, 229, 255, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 229, 255, 0.5);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* ==========================================================================
+       5. RIGHT SIDEBAR WIDGETS
+       ========================================================================== */
+    .right-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .widget-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+
+    .widget-title {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .btn-full-board {
+      background: rgba(0, 229, 255, 0.08);
+      border: 1px solid rgba(0, 229, 255, 0.25);
+      color: var(--accent-en);
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.25rem 0.55rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-full-board:hover {
+      background: rgba(0, 229, 255, 0.2);
+      box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+    }
+
+    /* LIVE RANKINGS */
+    .rankings-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .rank-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.65rem 0.85rem;
+      background: rgba(10, 14, 23, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    /* Highlighted YOU Row with Golden Glow */
+    .rank-card.rank-you {
+      background: linear-gradient(90deg, rgba(255, 215, 0, 0.15), rgba(10, 14, 23, 0.9));
+      border: 1px solid var(--gold-glow);
+      box-shadow: 0 0 25px rgba(255, 215, 0, 0.4);
+      transform: scale(1.02);
+    }
+
+    .rank-name {
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .rank-wpm {
+      font-weight: 800;
+      color: var(--accent-en);
+    }
+
+    .rank-you .rank-wpm {
+      color: var(--gold-glow);
+    }
+
+    /* VISUAL HEATMAP KEYBOARD (3-ROW CSS GRID) */
+    .keyboard-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: rgba(10, 14, 23, 0.8);
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .kb-row {
+      display: flex;
+      justify-content: center;
+      gap: 3px;
+    }
+
+    .key-cap {
+      width: 18px;
+      height: 20px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      transition: all 0.15s ease;
+    }
+
+    /* Key F Error Pulsing Glow */
+    .key-cap.error-glow {
+      background: var(--error-red) !important;
+      color: #FFFFFF !important;
+      border-color: #FF2255 !important;
+      box-shadow: 0 0 14px var(--error-red);
+      animation: errorPulse 1.2s infinite ease-in-out;
+    }
+
+    @keyframes errorPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 8px var(--error-red); }
+      50% { transform: scale(1.2); box-shadow: 0 0 20px var(--error-red); }
+    }
+
+    .heatmap-caption {
+      font-family: var(--font-mono);
+      font-size: 0.725rem;
+      font-weight: 800;
+      color: var(--error-red);
+      background: rgba(255, 34, 85, 0.1);
+      border: 1px solid rgba(255, 34, 85, 0.25);
+      padding: 0.5rem;
+      border-radius: 8px;
+      text-align: center;
+      margin-top: 0.5rem;
+    }
+
+    /* RPG BADGE QUEST CARD */
+    .badge-card-content {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .svg-ring-container {
+      position: relative;
+      width: 52px;
+      height: 52px;
+      flex-shrink: 0;
+    }
+
+    .svg-ring-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .badge-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      flex: 1;
+    }
+
+    .badge-title {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    .badge-sub {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+
+    .btn-view-all {
+      margin-top: 0.75rem;
+      width: 100%;
+      padding: 0.4rem;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-view-all:hover {
+      color: var(--accent-en);
+      border-color: var(--accent-en);
+      background: rgba(0, 229, 255, 0.08);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       1. TOP BAR (SINGLE UNIFIED FLEX CONTAINER - ONLY 1 SINGLE LANG TOGGLE)
+       ========================================================================== -->
+  <header class="top-bar">
+    <a href="#" class="brand-logo">
+      <span>🏠 TypingApp</span>
+    </a>
+
+    <div class="stats-group">
+      <!-- Unified Stats Row: [🔥 Streak: 1D] [🛡️ Shield: 10] [🏅 Lv.1] [⭐ 180/500 XP] [⏱️ 00:00] -->
+      <div class="stat-pill streak">🔥 Streak: 1D</div>
+      <div class="stat-pill shield">🛡️ Shield: 10</div>
+      <div class="stat-pill level">🏅 Lv.1</div>
+
+      <div class="xp-badge">
+        <span style="color: var(--gold-glow)">⭐ 180/500 XP</span>
+        <div class="xp-bar-track">
+          <div class="xp-bar-fill"></div>
+        </div>
+      </div>
+
+      <div class="stat-pill timer" id="timer-pill">⏱️ 00:00</div>
+
+      <!-- THE SINGLE & ONLY LANGUAGE TOGGLE IN THE ENTIRE UI -->
+      <select id="topbar-lang-select" class="lang-dropdown-select" onchange="switchLanguage(this.value)">
+        <option value="en">🇬🇧 EN</option>
+        <option value="hi">🇮🇳 हिंदी</option>
+      </select>
+    </div>
+  </header>
+
+  <!-- ==========================================================================
+       2. APP BODY LAYOUT
+       ========================================================================== -->
+  <div class="app-body">
+
+    <!-- LEFT SIDEBAR: MENU NAV -->
+    <aside class="left-sidebar glass-card">
+      <div class="nav-header">MENU</div>
+      <ul class="nav-list">
+        <li class="nav-item active"><a href="#">🏠 Dashboard</a></li>
+        <li class="nav-item"><a href="#">⌨️ Touch Lessons</a></li>
+        <li class="nav-item"><a href="#">📝 Practice Passages</a></li>
+        <li class="nav-item"><a href="#">🕹️ Retro Arcade</a></li>
+        <li class="nav-item"><a href="#">📊 Analytics</a></li>
+        <li class="nav-item"><a href="#">🏆 Leaderboard</a></li>
+        <li class="nav-item"><a href="#">⭐ Achievements</a></li>
+        <li class="nav-item"><a href="#">👥 Friends</a></li>
+        <li class="nav-item"><a href="#">⚙️ Settings</a></li>
+      </ul>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="main-content">
+      
+      <!-- UNCLUTTERED PILL ROWS FOR DURATION & MODES -->
+      <div class="pill-section">
+        <!-- Row 1: Duration -->
+        <div class="pill-row">
+          <span class="pill-row-label">DURATION:</span>
+          <button class="mode-pill active" onclick="setDuration(1)">1M</button>
+          <button class="mode-pill" onclick="setDuration(2)">2M</button>
+          <button class="mode-pill" onclick="setDuration(5)">5M</button>
+          <button class="mode-pill" onclick="setDuration(10)">10M</button>
+        </div>
+
+        <!-- Row 2: Modes including AI STORIES -->
+        <div class="pill-row">
+          <span class="pill-row-label">MODE:</span>
+          <button id="mode-standard" class="mode-pill active" onclick="selectMode('standard')">Standard</button>
+          <button id="mode-ai-stories" class="mode-pill ai-stories-pill" onclick="selectMode('ai-stories')">✨ AI STORIES</button>
+          <button id="mode-boss" class="mode-pill" onclick="selectMode('boss')">Boss</button>
+          <button id="mode-arcade" class="mode-pill" onclick="selectMode('arcade')">Arcade</button>
+          <button id="mode-free" class="mode-pill" onclick="selectMode('free')">Free</button>
+          <button id="mode-exam" class="mode-pill" onclick="selectMode('exam')">Exam</button>
+          <button id="mode-zen" class="mode-pill" onclick="selectMode('zen')">Zen</button>
+          <button id="mode-normal" class="mode-pill" onclick="selectMode('normal')">Normal</button>
+        </div>
+      </div>
+
+      <!-- Lesson Meta Bar with AI Story Refresh Button -->
+      <div class="lesson-meta-bar">
+        <div class="lesson-title" id="lesson-title">LESSON: HOME ROW DRILLS (BEGINNER)</div>
+        <button id="ai-gen-btn" class="btn-ai-gen" style="display: none;" onclick="generateNewAIStory()">
+          ✨ Generate New Story
+        </button>
+      </div>
+
+      <!-- Pre-filled Typing Area with Cursor -->
+      <div id="typing-box" class="typing-box" tabindex="0">
+        <span id="chars-typed" class="char-typed"></span>
+        <span id="char-current" class="char-current"></span>
+        <span id="chars-pending" class="char-pending"></span>
+      </div>
+
+      <!-- COMPACT SESSION TELEMETRY STATS BAR -->
+      <div class="telemetry-bar">
+        <div class="telemetry-item">
+          <span>📊 Speed:</span>
+          <span id="telemetry-wpm" class="telemetry-val">0 WPM</span>
+        </div>
+        <div class="telemetry-item">
+          <span>🎯 Precision:</span>
+          <span id="telemetry-precision" class="telemetry-val">100%</span>
+        </div>
+        <div class="telemetry-item">
+          <span>❌ Misses:</span>
+          <span id="telemetry-misses" class="telemetry-val" style="color: var(--error-red);">0</span>
+        </div>
+      </div>
+
+      <!-- Lesson Progress Section -->
+      <div class="progress-section">
+        <div class="progress-header">
+          <span>PROGRESS</span>
+          <span id="progress-percent" style="color: var(--accent-en);">0% Completed</span>
+        </div>
+        <div class="progress-track">
+          <div id="progress-fill" class="progress-fill"></div>
+        </div>
+      </div>
+
+      <!-- Controls Row -->
+      <div class="controls-row">
+        <button id="pause-btn" class="btn btn-primary" onclick="togglePause()">⏸️ PAUSE TUTOR</button>
+        <button id="restart-btn" class="btn btn-secondary" onclick="resetDrill()">🔄 RESTART DRILL</button>
+      </div>
+    </main>
+
+    <!-- RIGHT SIDEBAR WIDGETS -->
+    <aside class="right-sidebar">
+
+      <!-- LIVE RANKINGS -->
+      <section class="glass-card">
+        <div class="widget-title-row">
+          <div class="widget-title">LIVE RANKINGS</div>
+          <button class="btn-full-board">Full Board →</button>
+        </div>
+        <div class="rankings-list">
+          <div class="rank-card">
+            <span class="rank-name">🥇 Arjun S.</span>
+            <span class="rank-wpm">112 WPM</span>
+          </div>
+
+          <!-- Highlighted YOU Card with Golden Box-Shadow & Crown -->
+          <div class="rank-card rank-you">
+            <span class="rank-name">👑 YOU</span>
+            <span class="rank-wpm" id="you-wpm">84 WPM</span>
+          </div>
+
+          <div class="rank-card">
+            <span class="rank-name">🥉 Priya K.</span>
+            <span class="rank-wpm">79 WPM</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- VISUAL HEATMAP KEYBOARD -->
+      <section class="glass-card">
+        <div class="widget-title-row">
+          <div class="widget-title">VISUAL KEY HEATMAP</div>
+        </div>
+        <div class="keyboard-grid">
+          <div class="kb-row">
+            <div class="key-cap">Q</div><div class="key-cap">W</div><div class="key-cap">E</div><div class="key-cap">R</div><div class="key-cap">T</div><div class="key-cap">Y</div><div class="key-cap">U</div><div class="key-cap">I</div><div class="key-cap">O</div><div class="key-cap">P</div>
+          </div>
+          <div class="kb-row">
+            <div class="key-cap">A</div><div class="key-cap">S</div><div class="key-cap">D</div>
+            <div class="key-cap error-glow">F</div> <!-- Pulsing Red 'F' Key -->
+            <div class="key-cap">G</div><div class="key-cap">H</div><div class="key-cap">J</div><div class="key-cap">K</div><div class="key-cap">L</div><div class="key-cap">;</div>
+          </div>
+          <div class="kb-row">
+            <div class="key-cap">Z</div><div class="key-cap">X</div><div class="key-cap">C</div><div class="key-cap">V</div><div class="key-cap">B</div><div class="key-cap">N</div><div class="key-cap">M</div>
+          </div>
+        </div>
+        <div class="heatmap-caption">🔥 Most Mistyped: F (430x)</div>
+      </section>
+
+      <!-- NEXT BADGE GOAL (RPG QUEST CARD) -->
+      <section class="glass-card">
+        <div class="widget-title-row">
+          <div class="widget-title">NEXT BADGE GOAL</div>
+        </div>
+        <div class="badge-card-content">
+          <!-- Circular SVG Progress Ring (200/500 words = 40%) -->
+          <div class="svg-ring-container">
+            <svg width="52" height="52" viewBox="0 0 52 52">
+              <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4"/>
+              <circle cx="26" cy="26" r="22" fill="none" stroke="#FFD700" stroke-width="4"
+                      stroke-dasharray="138.2" stroke-dashoffset="82.9" stroke-linecap="round"
+                      transform="rotate(-90 26 26)"/>
+            </svg>
+            <div class="svg-ring-text">🏆</div>
+          </div>
+          <div class="badge-info">
+            <div class="badge-title">HOMEROW MASTER</div>
+            <div class="badge-sub">Progress: 200/500 words</div>
+          </div>
+        </div>
+        <button class="btn-view-all">View All Badges →</button>
+      </section>
+
+    </aside>
+
+  </div>
+
+  <!-- INTERACTIVE TYPING ENGINE & AI STORY GENERATOR SCRIPT -->
+  <script>
+    // Clean structured home-row drills (3-4 lines format)
+    const homeRowEnglish = 
+`a a a a a  s s s s s  d d d d d  f f f f f
+j j j j j  k k k k k  l l l l l  ; ; ; ; ;
+asdf jkl;  a s d f  j k l ;  af jk sd kl`;
+
+    const homeRowHindi = 
+`क क क क क  ख ख ख ख ख  ग ग ग ग ग  घ घ घ घ घ
+च च च च च  छ छ छ छ छ  ज ज ज ज ज  झ झ झ झ झ
+क ख ग घ  च छ ज झ  क च ख छ ग ज`;
+
+    // AI Story Repositories (English & Hindi)
+    const aiStoriesEnglish = [
+      "In a futuristic neon city of Cyberia, a lone rogue hacker decoded quantum neural networks to uncover hidden mysteries across the galactic grid.",
+      "The quick brown fox jumps over the lazy dog under the shimmering glow of orbital satellites beaming high-speed data down to earth.",
+      "Beyond the digital horizon, autonomous droids navigated past silicon towers, searching for ancient data crystals forgotten by time."
+    ];
+
+    const aiStoriesHindi = [
+      "एक दूरस्थ साइबर नगर में, एक साहसी प्रोग्रामर ने प्राचीन क्वांटम कोड को सुलझाकर पूरे तंत्र को जागृत किया।",
+      "राम राजा थे और अयोध्या उनकी राजधानी थी। डिजिटल युग में भी उनकी न्यायप्रियता की कथाएं सर्वत्र विख्यात हैं।",
+      "तारामंडल के उस पार, स्वायत्त रोबोटों का एक दल खोए हुए डेटा क्रिस्टल की खोज में अंतहीन अंतरिक्ष यात्रा पर निकला।"
+    ];
+
+    let currentLanguage = 'en';
+    let currentMode = 'standard';
+    let aiStoryIndex = 0;
+    let currentText = homeRowEnglish;
+
+    let typedIndex = 0;
+    let startTime = null;
+    let timerInterval = null;
+    let elapsedTime = 0;
+    let isPaused = false;
+    let totalKeystrokes = 0;
+    let missCount = 0;
+
+    // DOM Elements
+    const charsTypedElem = document.getElementById('chars-typed');
+    const charCurrentElem = document.getElementById('char-current');
+    const charsPendingElem = document.getElementById('chars-pending');
+    const progressFillElem = document.getElementById('progress-fill');
+    const progressPercentElem = document.getElementById('progress-percent');
+    const timerPillElem = document.getElementById('timer-pill');
+    const youWpmElem = document.getElementById('you-wpm');
+    const telemetryWpm = document.getElementById('telemetry-wpm');
+    const telemetryPrecision = document.getElementById('telemetry-precision');
+    const telemetryMisses = document.getElementById('telemetry-misses');
+    const typingBox = document.getElementById('typing-box');
+    const pauseBtn = document.getElementById('pause-btn');
+    const lessonTitle = document.getElementById('lesson-title');
+    const aiGenBtn = document.getElementById('ai-gen-btn');
+
+    function renderText() {
+      const typed = currentText.slice(0, typedIndex);
+      const current = currentText[typedIndex] || '';
+      const pending = currentText.slice(typedIndex + 1);
+
+      charsTypedElem.textContent = typed;
+      charCurrentElem.textContent = current === ' ' ? '␣' : (current === '\n' ? '↵\n' : current);
+      charsPendingElem.textContent = pending;
+
+      // Update progress bar
+      const percent = Math.floor((typedIndex / currentText.length) * 100);
+      progressFillElem.style.width = percent + '%';
+      progressPercentElem.textContent = percent + '% Completed';
+
+      // Update precision
+      const precision = totalKeystrokes > 0 ? Math.round(((totalKeystrokes - missCount) / totalKeystrokes) * 100) : 100;
+      telemetryPrecision.textContent = `${precision}%`;
+      telemetryMisses.textContent = missCount;
+    }
+
+    function switchLanguage(lang) {
+      currentLanguage = lang;
+      document.getElementById('topbar-lang-select').value = lang;
+      
+      if (currentMode === 'ai-stories') {
+        loadAIStory();
+      } else {
+        currentText = (lang === 'en') ? homeRowEnglish : homeRowHindi;
+        lessonTitle.textContent = (lang === 'en') ? 'LESSON: HOME ROW DRILLS (BEGINNER)' : 'पाठ: होम रो अभ्यास (प्रारंभिक)';
+      }
+      resetDrill();
+    }
+
+    function selectMode(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.pill-section .mode-pill').forEach(btn => btn.classList.remove('active'));
+      
+      const activePill = document.getElementById(`mode-${mode}`);
+      if (activePill) activePill.classList.add('active');
+
+      if (mode === 'ai-stories') {
+        aiGenBtn.style.display = 'inline-flex';
+        loadAIStory();
+      } else {
+        aiGenBtn.style.display = 'none';
+        currentText = (currentLanguage === 'en') ? homeRowEnglish : homeRowHindi;
+        lessonTitle.textContent = (currentLanguage === 'en') ? `LESSON: ${mode.toUpperCase()} MODE DRILL` : `पाठ: ${mode.toUpperCase()} मोड अभ्यास`;
+      }
+      resetDrill();
+    }
+
+    function setDuration(mins) {
+      document.querySelectorAll('.pill-row button').forEach(b => {
+        if (b.textContent.includes('M')) b.classList.remove('active');
+      });
+      event.target.classList.add('active');
+      resetDrill();
+    }
+
+    function loadAIStory() {
+      const storyList = (currentLanguage === 'en') ? aiStoriesEnglish : aiStoriesHindi;
+      currentText = storyList[aiStoryIndex % storyList.length];
+      lessonTitle.textContent = (currentLanguage === 'en') 
+        ? `AI STORY #${(aiStoryIndex % storyList.length) + 1}: CYBER CHRONICLES` 
+        : `एआई कहानी #${(aiStoryIndex % storyList.length) + 1}: साइबर गाथा`;
+    }
+
+    function generateNewAIStory() {
+      aiStoryIndex++;
+      loadAIStory();
+      resetDrill();
+    }
+
+    function startTimer() {
+      if (timerInterval) return;
+      startTime = Date.now() - (elapsedTime * 1000);
+      timerInterval = setInterval(() => {
+        if (!isPaused) {
+          elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+          const mins = String(Math.floor(elapsedTime / 60)).padStart(2, '0');
+          const secs = String(elapsedTime % 60).padStart(2, '0');
+          timerPillElem.textContent = `⏱️ ${mins}:${secs}`;
+
+          // Update WPM
+          if (elapsedTime > 0 && typedIndex > 0) {
+            const wpm = Math.round((typedIndex / 5) / (elapsedTime / 60));
+            youWpmElem.textContent = `${wpm} WPM`;
+            telemetryWpm.textContent = `${wpm} WPM`;
+          }
+        }
+      }, 1000);
+    }
+
+    function togglePause() {
+      isPaused = !isPaused;
+      if (isPaused) {
+        pauseBtn.textContent = '▶️ RESUME TUTOR';
+      } else {
+        pauseBtn.textContent = '⏸️ PAUSE TUTOR';
+        if (typedIndex > 0) startTimer();
+      }
+    }
+
+    function resetDrill() {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      elapsedTime = 0;
+      typedIndex = 0;
+      totalKeystrokes = 0;
+      missCount = 0;
+      isPaused = false;
+      timerPillElem.textContent = '⏱️ 00:00';
+      telemetryWpm.textContent = '0 WPM';
+      telemetryPrecision.textContent = '100%';
+      telemetryMisses.textContent = '0';
+      pauseBtn.textContent = '⏸️ PAUSE TUTOR';
+      renderText();
+    }
+
+    // Handle typing keyboard events
+    window.addEventListener('keydown', (e) => {
+      if (isPaused) return;
+      if (['Shift', 'Control', 'Alt', 'Meta', 'Tab', 'CapsLock'].includes(e.key)) return;
+
+      if (e.key === 'Backspace') {
+        if (typedIndex > 0) {
+          typedIndex--;
+          renderText();
+        }
+        return;
+      }
+
+      if (!timerInterval) startTimer();
+
+      totalKeystrokes++;
+      const expectedChar = currentText[typedIndex];
+
+      if (e.key === expectedChar || (expectedChar === '\n' && e.key === 'Enter')) {
+        typedIndex++;
+        if (typedIndex >= currentText.length) {
+          clearInterval(timerInterval);
+        }
+        renderText();
+      } else if (e.key.length === 1 || e.key === 'Enter') {
+        missCount++;
+        charCurrentElem.classList.add('error-flash');
+        setTimeout(() => charCurrentElem.classList.remove('error-flash'), 200);
+        renderText();
+      }
+    });
+
+    // Initialize display on load
+    window.addEventListener('load', () => {
+      renderText();
+      typingBox.focus();
+    });
+  </script>
+
+</body>
+</html>

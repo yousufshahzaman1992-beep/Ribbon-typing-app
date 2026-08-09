@@ -76,7 +76,7 @@ const ENGLISH_LESSONS: Lesson[] = [
     keys: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'], 
     desc: "Pure home row drills for complete beginners.", 
     category: "Touch Typing Basics",
-    customText: "a a a a a s s s s s d d d d d f f f f f j j j j j k k k k k l l l l l ; ; ; ; ; asdf jkl; asdf jkl; a s d f j k l ; asdf jkl; a s d f j k l ; asdf jkl; asdf jkl; a s d f j k l ; asdf jkl; a s d f j k l ; asdf jkl; asdf jkl; a s d f j k l ; asdf jkl; a s d f j k l ; asdf jkl; asdf jkl; a s d f j k l ; asdf jkl; a s d f j k l ; asdf jkl; asdf jkl; a s d f j k l ; asdf jkl;"
+    customText: "a a a a a s s s s s d d d d d f f f f f j j j j j k k k k k l l l l l ; ; ; ; ; ask dad lad fall flash glad flask sad fads flak kals salad alfalfa"
   },
   { 
     id: 1, 
@@ -84,7 +84,7 @@ const ENGLISH_LESSONS: Lesson[] = [
     keys: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'], 
     desc: "Combined key drills using the home row keys.", 
     category: "Touch Typing Basics",
-    customText: "as as df df jk jk l; l; asdf jkl; asdf jkl; as df jk l; asdf jkl; as df jk l; as as df df jk jk l; l; asdf jkl; asdf jkl; as df jk l; asdf jkl; as df jk l; as as df df jk jk l; l; asdf jkl; asdf jkl; as df jk l; asdf jkl; as df jk l; as as df df jk jk l; l; asdf jkl; asdf jkl; as df jk l; asdf jkl;"
+    customText: "as df jk l; fall dad lad ask flash glad flask sad fads flak kals salad alfalfa flask fall dad lad ask flash glad flask sad fads flak"
   },
   { 
     id: 2, 

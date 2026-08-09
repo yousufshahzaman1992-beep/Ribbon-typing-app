@@ -7,6 +7,7 @@ interface VirtualKeyboardProps {
   layout?: 'qwerty' | 'dvorak' | 'colemak';
   physicalKeyPresses?: Record<string, number>;
   physicalKeyErrors?: Record<string, number>;
+  onKeyClick?: (char: string) => void;
 }
 
 const LAYOUTS = {
@@ -46,6 +47,7 @@ const KEY_CODES: Record<'qwerty' | 'dvorak' | 'colemak', string[][]> = {
 };
 
 interface KeyButtonProps {
+  charKey: string;
   displayChar: string;
   fontClass: string;
   isPressed: boolean;
@@ -54,9 +56,11 @@ interface KeyButtonProps {
   heatBorder: string;
   heatText: string;
   heatGlow: string;
+  onClick?: (char: string) => void;
 }
 
 const KeyButtonComponent: React.FC<KeyButtonProps> = ({
+  charKey,
   displayChar,
   fontClass,
   isPressed,
@@ -65,6 +69,7 @@ const KeyButtonComponent: React.FC<KeyButtonProps> = ({
   heatBorder,
   heatText,
   heatGlow,
+  onClick,
 }) => {
   let stylingClass = `${heatBg} ${heatBorder} ${heatText} ${heatGlow}`;
 
@@ -77,7 +82,9 @@ const KeyButtonComponent: React.FC<KeyButtonProps> = ({
 
   return (
     <div
-      className={`border flex items-center justify-center select-none uppercase shrink-0 transition-colors duration-75 rounded-[4px] md:rounded-[6px] lg:rounded-[8px] ${fontClass} ${stylingClass}`}
+      onClick={() => onClick && onClick(charKey)}
+      title={`Click key '${charKey.toUpperCase()}' to launch targeted repair drill`}
+      className={`border flex items-center justify-center select-none uppercase shrink-0 transition-colors duration-75 rounded-[4px] md:rounded-[6px] lg:rounded-[8px] cursor-pointer hover:border-amber-400/80 active:scale-95 ${fontClass} ${stylingClass}`}
       style={{
         width: 'calc((100cqw - 30px) / 13)',
         height: 'calc((100cqw - 30px) / 13)',
@@ -101,6 +108,7 @@ const VirtualKeyboardComponent: React.FC<VirtualKeyboardProps> = ({
   layout = 'qwerty',
   physicalKeyPresses = {},
   physicalKeyErrors = {},
+  onKeyClick,
 }) => {
   const [localPressedCode, setLocalPressedCode] = useState<string | null>(null);
 
@@ -267,6 +275,7 @@ const VirtualKeyboardComponent: React.FC<VirtualKeyboardProps> = ({
             return (
               <KeyButton
                 key={`${rIdx}-${colIdx}-${k}`}
+                charKey={k}
                 displayChar={displayChar}
                 fontClass={fontClass}
                 isPressed={isPressed}
@@ -275,6 +284,7 @@ const VirtualKeyboardComponent: React.FC<VirtualKeyboardProps> = ({
                 heatBorder={heat.border}
                 heatText={heat.text}
                 heatGlow={heat.glow}
+                onClick={onKeyClick}
               />
             );
           })}
