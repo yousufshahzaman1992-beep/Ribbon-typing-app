@@ -43,7 +43,9 @@ import {
   Upload,
   Clock,
   Zap,
-  Trash2
+  Trash2,
+  GraduationCap,
+  UserCheck
 } from 'lucide-react';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { ArcadeHub } from './components/ArcadeHub';
@@ -411,9 +413,9 @@ function getSmartSuggestion(partialWord: string): string {
 }
 
 export default function App() {
-  // Navigation & UI Layout State
   const [activeModal, setActiveModal] = useState<'lessons' | 'practice' | 'stats' | 'settings' | 'leaderboard' | 'achievements' | 'friends' | 'themes' | 'history' | 'goals' | 'sounds' | 'calendar' | null>(null);
   const [sidebarExpanded, setSidebarExpanded] = useState<boolean>(true);
+  const [lessonCategoryTab, setLessonCategoryTab] = useState<'basics' | 'stories' | 'exams'>('basics');
 
   // Custom Story & Text State
   const [customStoryModalOpen, setCustomStoryModalOpen] = useState<boolean>(false);
@@ -3384,7 +3386,7 @@ export default function App() {
         className={`
           hidden xl:flex
           ${sidebarExpanded ? 'w-[240px]' : 'w-[64px]'}
-          flex-col justify-between items-stretch py-6 select-none bg-[#0D0F1A]/95 border-r border-zinc-800/80 shadow-2xl backdrop-blur-xl transition-all duration-300 ease-in-out shrink-0 h-screen z-45
+          flex-col justify-between items-stretch py-6 select-none bg-[#0D0F1A]/95 border-r border-zinc-800/80 shadow-2xl backdrop-blur-xl transition-all duration-300 ease-in-out shrink-0 h-screen z-50 relative
         `}
       >
         <div className="flex flex-col items-stretch w-full">
@@ -6016,20 +6018,20 @@ export default function App() {
 
 
 
-      {/* 4. PREMIUM COMPREHENSIVE SLIDE-OUT PANEL SYSTEM (PINS TO RIGHT SIDE OF SCREEN) */}
+      {/* 4. PREMIUM COMPREHENSIVE MODAL VIEW SYSTEM (CENTERED PRO GLASSMORPHIC CONTAINER) */}
       {activeModal !== null && (
-        <div className="absolute inset-y-0 right-0 z-45 flex justify-end select-none w-full pointer-events-none">
-          {/* Backdrop (semi-transparent overlay on left, dismissed on click) */}
+        <div className={`fixed inset-0 z-45 flex items-center justify-center p-3 sm:p-6 md:p-8 select-none ${sidebarExpanded ? 'xl:pl-[256px]' : 'xl:pl-[80px]'} transition-all duration-300 pointer-events-none`}>
+          {/* Backdrop (semi-transparent overlay on workspace, dismissed on click) */}
           <div
-            className="absolute inset-0 bg-[#0F0F12]/60 backdrop-blur-xs transition-opacity duration-300 pointer-events-auto"
+            className={`fixed inset-0 bg-[#0F0F12]/75 backdrop-blur-md transition-all duration-300 pointer-events-auto ${sidebarExpanded ? 'xl:left-[240px]' : 'xl:left-[64px]'}`}
             onClick={() => {
               setActiveModal(null);
               sfx.playClick();
             }}
           />
 
-          {/* Slide-out Panel container */}
-          <div className="relative bg-[#0D0F1A]/95 backdrop-blur-xl border-l border-amber-500/20 w-full max-w-xl md:max-w-2xl h-full flex flex-col shadow-[-15px_0_50px_rgba(0,0,0,0.8)] z-10 pointer-events-auto transition-all duration-300">
+          {/* Centered Main Glassmorphic Panel container */}
+          <div className="relative bg-[#0D0F1A]/95 backdrop-blur-2xl border border-amber-500/30 rounded-3xl w-full max-w-4xl max-h-[88vh] flex flex-col shadow-[0_0_60px_rgba(0,0,0,0.9)] z-10 pointer-events-auto transition-all duration-300 overflow-hidden">
 
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4.5 border-b border-zinc-800/80 bg-[#121424]/90">
@@ -6100,8 +6102,50 @@ export default function App() {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {LESSONS.filter(l => l.category === (currentScript === 'hindi' ? 'Touch Typing Basics (Hindi)' : 'Touch Typing Basics')).map((lesson) => {
+                  {/* Lesson Category Filter Tabs */}
+                  <div className="flex gap-2 p-1 bg-[#121422] border border-zinc-800/80 rounded-xl font-mono text-xs select-none">
+                    <button
+                      onClick={() => setLessonCategoryTab('basics')}
+                      className={`flex-1 py-2 px-3 rounded-lg font-bold transition-all cursor-pointer ${
+                        lessonCategoryTab === 'basics'
+                          ? 'bg-amber-400 text-zinc-950 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                          : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      📖 Basics ({currentScript === 'hindi' ? 'हिंदी' : 'English'})
+                    </button>
+                    <button
+                      onClick={() => setLessonCategoryTab('stories')}
+                      className={`flex-1 py-2 px-3 rounded-lg font-bold transition-all cursor-pointer ${
+                        lessonCategoryTab === 'stories'
+                          ? 'bg-amber-400 text-zinc-950 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                          : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      📚 Stories
+                    </button>
+                    <button
+                      onClick={() => setLessonCategoryTab('exams')}
+                      className={`flex-1 py-2 px-3 rounded-lg font-bold transition-all cursor-pointer ${
+                        lessonCategoryTab === 'exams'
+                          ? 'bg-amber-400 text-zinc-950 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                          : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      🏛️ Civil Exams
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1 scrollbar-none">
+                    {LESSONS.filter(l => {
+                      if (lessonCategoryTab === 'basics') {
+                        return l.category === (currentScript === 'hindi' ? 'Touch Typing Basics (Hindi)' : 'Touch Typing Basics');
+                      }
+                      if (lessonCategoryTab === 'stories') {
+                        return l.category === (currentScript === 'hindi' ? 'Practice Stories (Hindi)' : 'Practice Stories');
+                      }
+                      return l.category === (currentScript === 'hindi' ? 'Clerical Civil Exams (Hindi)' : 'Clerical Civil Exams');
+                    }).map((lesson) => {
                       const isSelected = currentLesson.id === lesson.id;
                       return (
                         <div
@@ -6121,7 +6165,7 @@ export default function App() {
                               <span className={`text-[9px] font-mono uppercase font-black px-2 py-0.5 rounded-md ${
                                 isSelected ? 'bg-amber-400 text-zinc-950' : 'bg-zinc-800/80 text-amber-400'
                               }`}>
-                                {currentScript === 'hindi' ? `Stage ${lesson.id - 499}` : `Stage ${lesson.id + 1}`}
+                                {lesson.category || 'Lesson'}
                               </span>
                               {isSelected && <span className="text-[9px] font-mono font-bold text-amber-400 animate-pulse">ACTIVE ●</span>}
                             </div>
@@ -6378,8 +6422,8 @@ export default function App() {
                     {/* Heatmap Key Fumbles Section */}
                     <div className="space-y-3 bg-[#121422]/90 p-4 rounded-2xl border border-zinc-800/80 shadow-md">
                       {(() => {
-                        const sortedFumbles = Object.entries(fumbles).sort((a, b) => b[1] - a[1]);
-                        const maxFumbleCount = sortedFumbles.length > 0 ? Math.max(...sortedFumbles.map(f => f[1])) : 1;
+                        const sortedFumbles = Object.entries(fumbles).sort((a, b) => (Number(b[1]) || 0) - (Number(a[1]) || 0));
+                        const maxFumbleCount = sortedFumbles.length > 0 ? Math.max(...sortedFumbles.map(f => Number(f[1]) || 0)) : 1;
                         return (
                           <>
                             <div className="flex items-center justify-between">
@@ -6396,7 +6440,8 @@ export default function App() {
                                   <p className="text-xs text-emerald-400 font-mono font-semibold">✨ No failures registered! Flawless accuracy performance.</p>
                                 </div>
                               ) : (
-                                sortedFumbles.map(([char, count]) => {
+                                sortedFumbles.map(([char, rawCount]) => {
+                                  const count = Number(rawCount) || 0;
                                   const isHighError = count > maxFumbleCount * 0.5;
                                   const isMedError = count > maxFumbleCount * 0.2;
                                   return (
@@ -7484,10 +7529,10 @@ export default function App() {
                   {/* Friends list */}
                   <div className="space-y-3">
                     <span className="text-[10px] font-mono text-amber-400 uppercase tracking-wider block font-extrabold flex items-center gap-1.5">
-                      <UserCheck className="w-3.5 h-3.5 text-amber-400" /> People You Follow ({friendsList.length})
+                      <UserCheck className="w-3.5 h-3.5 text-amber-400" /> People You Follow ({(Array.isArray(friendsList) ? friendsList : []).length})
                     </span>
                     <div className="bg-[#121422]/90 border border-zinc-800/80 rounded-2xl overflow-hidden divide-y divide-zinc-800/60 shadow-md">
-                      {friendsList.length === 0 ? (
+                      {(!Array.isArray(friendsList) || friendsList.length === 0) ? (
                         <p className="p-4 text-xs text-zinc-400 font-mono italic text-center">You are currently typing in solo queue. Search and follow above!</p>
                       ) : (
                         friendsList.map(friend => (
@@ -7524,7 +7569,7 @@ export default function App() {
                               </button>
                               <button
                                 onClick={() => {
-                                  setFriendsList(prev => prev.filter(f => f !== friend));
+                                  setFriendsList(prev => (Array.isArray(prev) ? prev : []).filter(f => f !== friend));
                                   sfx.playClick();
                                 }}
                                 className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-400 text-[10px] font-mono rounded-xl border border-rose-500/20 transition-all cursor-pointer"
@@ -7544,7 +7589,7 @@ export default function App() {
                       <Activity className="w-3.5 h-3.5 text-amber-400" /> Dynamic Activity Feed
                     </span>
                     <div className="bg-[#121422]/90 border border-zinc-800/80 p-4 rounded-2xl space-y-3 max-h-56 overflow-y-auto text-left scrollbar-none shadow-md">
-                      {activities.length === 0 ? (
+                      {(!Array.isArray(activities) || activities.length === 0) ? (
                         <p className="text-xs text-zinc-500 italic text-center">No social activity registered yet.</p>
                       ) : (
                         activities.map((act, i) => (
