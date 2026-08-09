@@ -302,7 +302,7 @@ const VirtualKeyboardComponent: React.FC<VirtualKeyboardProps> = ({
                 : 'bg-[#1F2833] border-white/5 text-[#C5C6C7]'
           }`}
           style={{
-            width: 'calc((100cqw - 30px) * 0.5)',
+            width: 'min(220px, 45%)',
             height: 'calc((100cqw - 30px) / 13)',
             maxWidth: '220px',
             maxHeight: '40px',

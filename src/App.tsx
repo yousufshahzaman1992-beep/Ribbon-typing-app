@@ -6031,10 +6031,10 @@ export default function App() {
           />
 
           {/* Centered Main Glassmorphic Panel container */}
-          <div className="relative bg-[#0D0F1A]/95 backdrop-blur-2xl border border-amber-500/30 rounded-3xl w-full max-w-4xl max-h-[88vh] flex flex-col shadow-[0_0_60px_rgba(0,0,0,0.9)] z-10 pointer-events-auto transition-all duration-300 overflow-hidden">
+          <div className="relative bg-[#0D0F1A]/95 backdrop-blur-2xl border border-amber-500/30 rounded-2xl sm:rounded-3xl w-full max-w-4xl max-h-[92vh] sm:max-h-[88vh] flex flex-col shadow-[0_0_60px_rgba(0,0,0,0.9)] z-10 pointer-events-auto transition-all duration-300 overflow-hidden">
 
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4.5 border-b border-zinc-800/80 bg-[#121424]/90">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4.5 border-b border-zinc-800/80 bg-[#121424]/90">
               <div className="flex items-center gap-2.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_10px_#f59e0b] animate-pulse" />
                 <h3 className="font-extrabold text-white tracking-wider uppercase text-xs font-mono">
@@ -6066,7 +6066,7 @@ export default function App() {
             </div>
 
             {/* Modal Body content */}
-            <div className="p-6 overflow-y-auto flex-1 space-y-6 scrollbar-none">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 sm:space-y-6 scrollbar-none">
 
               {/* A. LESSONS DIRECTORY MODAL CONTENT */}
               {activeModal === 'lessons' && (
