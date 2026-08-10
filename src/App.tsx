@@ -4491,7 +4491,7 @@ export default function App() {
           {/* A. RIBBON STATS BAR (Placed just above the dominant text area) */}
           {!arcadeActive && (
             <>
-              <div className="hidden md:flex w-full max-w-4xl flex-col md:flex-row items-stretch md:items-center justify-between gap-3 px-4 py-2.5 border border-zinc-800 bg-[#1F2833]/30 rounded-[12px] mb-3.5 text-xs font-mono select-none shadow-md backdrop-blur-sm">
+              <div className="flex w-full max-w-4xl flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 border border-zinc-800 bg-[#1F2833]/30 rounded-[12px] mb-2.5 sm:mb-3.5 text-xs font-mono select-none shadow-md backdrop-blur-sm">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="w-2 h-2 rounded-full bg-[#45A29E] animate-pulse" />
                   <span className="text-[#45A29E] font-black uppercase tracking-wider text-[10px] font-sans">
@@ -4614,7 +4614,7 @@ export default function App() {
 
           {/* PROGRESS BAR DIRECTLY ABOVE THE TEXT BLOCK */}
           {!arcadeActive && !workoutCompleted && (
-            <div className="hidden md:block w-full max-w-4xl mb-4 select-none space-y-2.5">
+            <div className="w-full max-w-4xl mb-2.5 sm:mb-4 select-none space-y-2">
               <div>
                 <div className="flex justify-between items-center text-[10px] font-mono text-zinc-400 mb-1.5">
                   <span className="tracking-wider font-extrabold text-zinc-500 uppercase text-[9px]">Lesson Progress</span>
@@ -4660,10 +4660,10 @@ export default function App() {
           {/* B. THE STAR ELEMENT: THE TYPING TEXT AREA (With explicit min-height constraints to prevent overflow) */}
           <div className={`
             ${isPanelCollapsed
-              ? 'flex-1 min-h-[220px] max-h-[65dvh] overflow-hidden'
-              : 'h-[25vh] min-h-[140px] max-h-[35vh] overflow-hidden'
+              ? 'flex-1 min-h-[200px] sm:min-h-[260px] max-h-[60dvh] overflow-hidden'
+              : 'h-[25vh] min-h-[140px] sm:min-h-[180px] max-h-[35vh] overflow-hidden'
             } 
-            md:h-[45vh] md:min-h-[300px] md:max-h-[50vh] md:overflow-hidden w-full max-w-4xl flex flex-col justify-start items-center relative bg-zinc-950/20 border border-zinc-900/40 rounded-[20px] p-3 md:p-6 mb-2
+            w-full max-w-4xl flex flex-col justify-start items-center relative bg-zinc-950/20 border border-zinc-900/40 rounded-[20px] p-3 sm:p-6 mb-2
           `}>
 
             {/* Pause Screen Overlay */}
