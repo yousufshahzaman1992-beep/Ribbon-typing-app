@@ -15,11 +15,8 @@ import {
   Volume2,
   VolumeX,
   Sparkles,
-  Shield,
   Activity,
   Sliders,
-  ChevronDown,
-  ChevronUp,
   Info,
   RefreshCw,
   Globe,
@@ -45,7 +42,15 @@ import {
   Zap,
   Trash2,
   GraduationCap,
-  UserCheck
+  UserCheck,
+  Bot,
+  Skull,
+  PenLine,
+  Feather,
+  Ghost,
+  Share2,
+  Shuffle,
+  Brain
 } from 'lucide-react';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { ArcadeHub } from './components/ArcadeHub';
@@ -515,18 +520,22 @@ export default function App() {
       setSidebarExpanded(false);
     }
   }, []);
-  const [mobileStatsOpen, setMobileStatsOpen] = useState<boolean>(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState<boolean>(false);
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('ribbon-panel-collapsed') === 'true';
-    }
-    return false;
-  });
-  const [keyboardVisibleOnMobile, setKeyboardVisibleOnMobile] = useState<boolean>(false);
+  const [keyboardVisibleOnMobile, setKeyboardVisibleOnMobile] = useState<boolean>(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [aiStoryOpen, setAiStoryOpen] = useState<boolean>(false);
   const [weaknessOpen, setWeaknessOpen] = useState<boolean>(false);
+  const [modesMenuOpen, setModesMenuOpen] = useState<boolean>(false);
+  const [modesMenuPos, setModesMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [contentMenuOpen, setContentMenuOpen] = useState<boolean>(false);
+  const [contentMenuPos, setContentMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [durationMenuOpen, setDurationMenuOpen] = useState<boolean>(false);
+  const [durationMenuPos, setDurationMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [aiStoryPos, setAiStoryPos] = useState<{ top: number; left: number } | null>(null);
+  const modesMenuBtnRef = useRef<HTMLButtonElement | null>(null);
+  const contentMenuBtnRef = useRef<HTMLButtonElement | null>(null);
+  const durationMenuBtnRef = useRef<HTMLButtonElement | null>(null);
+  const aiStoryBtnRef = useRef<HTMLButtonElement | null>(null);
   // Unified typing state for batch updates
   const [typingState, setTypingState] = useState<{
     typedText: string;
@@ -568,6 +577,55 @@ export default function App() {
   // Defer keyboard heat-map stats so they never block the typing render critical path
   const deferredPhysicalKeyPresses = React.useDeferredValue(physicalKeyPresses);
   const deferredPhysicalKeyErrors = React.useDeferredValue(physicalKeyErrors);
+
+  // Coalesce per-keystroke stats: accumulate into refs (no render) and flush to state on a
+  // throttle, so the full App tree does not re-render on every single keydown.
+  const pendingStatsRef = useRef<{
+    physicalKeyPresses: Record<string, number>;
+    physicalKeyErrors: Record<string, number>;
+    fumbles: Record<string, number>;
+  }>({ physicalKeyPresses: {}, physicalKeyErrors: {}, fumbles: {} });
+  const statsFlushTimerRef = useRef<number | null>(null);
+
+  const flushPendingStats = useCallback(() => {
+    statsFlushTimerRef.current = null;
+    const pending = pendingStatsRef.current;
+    const hasChanges =
+      Object.keys(pending.physicalKeyPresses).length +
+      Object.keys(pending.physicalKeyErrors).length +
+      Object.keys(pending.fumbles).length;
+    if (hasChanges === 0) return;
+    pendingStatsRef.current = { physicalKeyPresses: {}, physicalKeyErrors: {}, fumbles: {} };
+    startStatsTransition(() => {
+      setTypingState(prev => {
+        const next = { ...prev };
+        const pressKeys = Object.keys(pending.physicalKeyPresses);
+        if (pressKeys.length > 0) {
+          next.physicalKeyPresses = { ...prev.physicalKeyPresses };
+          for (const k of pressKeys) next.physicalKeyPresses[k] = (next.physicalKeyPresses[k] || 0) + pending.physicalKeyPresses[k];
+        }
+        const errorKeys = Object.keys(pending.physicalKeyErrors);
+        if (errorKeys.length > 0) {
+          next.physicalKeyErrors = { ...prev.physicalKeyErrors };
+          for (const k of errorKeys) next.physicalKeyErrors[k] = (next.physicalKeyErrors[k] || 0) + pending.physicalKeyErrors[k];
+        }
+        const fumbleKeys = Object.keys(pending.fumbles);
+        if (fumbleKeys.length > 0) {
+          next.fumbles = { ...prev.fumbles };
+          for (const k of fumbleKeys) next.fumbles[k] = (next.fumbles[k] || 0) + pending.fumbles[k];
+        }
+        return next;
+      });
+    });
+  }, [startStatsTransition, setTypingState]);
+
+  const queuePendingStat = useCallback((kind: 'physicalKeyPresses' | 'physicalKeyErrors' | 'fumbles', key: string) => {
+    const p = pendingStatsRef.current;
+    p[kind][key] = (p[kind][key] || 0) + 1;
+    if (statsFlushTimerRef.current === null) {
+      statsFlushTimerRef.current = window.setTimeout(flushPendingStats, 300);
+    }
+  }, [flushPendingStats]);
 
   const setTypedText = (val: string | ((prev: string) => string)) => {
     setTypingState(prev => ({
@@ -679,7 +737,7 @@ export default function App() {
     return saved ? JSON.parse(saved) : {
       bg: "#0B0C10",
       text: "#C5C6C7",
-      cursor: "#00F0FF",
+      cursor: "#F59E0B",
       accent: "#45A29E",
       error: "#FF4444",
       correct: "#45A29E"
@@ -1276,7 +1334,6 @@ export default function App() {
 
   // Scrolling refs for typing area
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mobileContainerRef = useRef<HTMLDivElement | null>(null);
   const activeCharRef = useRef<HTMLSpanElement | null>(null);
   const isAppendingRef = useRef<boolean>(false);
   // AI story auto-append: tracks whether a background prefetch is already in flight
@@ -1288,10 +1345,7 @@ export default function App() {
     if (containerRef.current && (containerRef.current.offsetParent !== null || containerRef.current.clientWidth > 0)) {
       return containerRef.current;
     }
-    if (mobileContainerRef.current && (mobileContainerRef.current.offsetParent !== null || mobileContainerRef.current.clientWidth > 0)) {
-      return mobileContainerRef.current;
-    }
-    return (containerRef.current || mobileContainerRef.current || document.querySelector('.typing-area')) as HTMLDivElement | null;
+    return document.querySelector('.typing-area') as HTMLDivElement | null;
   };
 
   // Arcade mini-game states (Ribbon Invaders played in upper text area container)
@@ -1343,7 +1397,6 @@ export default function App() {
     // Reset scroll position so text always starts from the top on lesson load
     requestAnimationFrame(() => {
       if (containerRef.current) containerRef.current.scrollTop = 0;
-      if (mobileContainerRef.current) mobileContainerRef.current.scrollTop = 0;
     });
   }, [derivedTargetText]);
 
@@ -1368,8 +1421,8 @@ export default function App() {
 
       const topic = storyTopic || 'typing practice';
 
+      let newChunk = "";
       (async () => {
-        let newChunk = "";
         try {
           const res = await fetch('/api/generate-story', {
             method: 'POST',
@@ -1411,6 +1464,8 @@ export default function App() {
         }
       })().finally(() => {
         aiPrefetchInFlightRef.current = false;
+        // If the prefetch failed entirely, allow a retry at the next threshold
+        if (!newChunk) aiPrefetchTriggeredAtRef.current = 0;
       });
     }
   }, [typedText.length, targetText, currentLesson.id, workoutCompleted, storyTopic, storyDuration, getLessonStructure, buildTargetTextFromStructure]);
@@ -1433,6 +1488,9 @@ export default function App() {
   const arcadeActiveRef = useRef(arcadeActive);
   const keyboardLayoutRef = useRef(keyboardLayout);
   const examModeRef = useRef(examMode);
+  const botProgressRef = useRef(botProgress);
+  const bossProgressRef = useRef(bossProgress);
+  const userXpRef = useRef(userXp);
   const handleTypingKeyRef = useRef<(key: string, physicalCode?: string) => void>(() => { });
 
   // Keep refs in sync with state in a single consolidated useEffect to minimize commit phase overhead
@@ -1454,10 +1512,14 @@ export default function App() {
     arcadeActiveRef.current = arcadeActive;
     keyboardLayoutRef.current = keyboardLayout;
     examModeRef.current = examMode;
+    botProgressRef.current = botProgress;
+    bossProgressRef.current = bossProgress;
+    userXpRef.current = userXp;
   }, [
     typedText, targetText, currentLesson, autoInsertedBrackets, workoutCompleted,
     isPaused, timedEndModalOpen, freestyleMode, activeAppMode, startTime,
-    elapsed, testDuration, currentPassageIndex, activeModal, arcadeActive, keyboardLayout, examMode
+    elapsed, testDuration, currentPassageIndex, activeModal, arcadeActive, keyboardLayout, examMode,
+    botProgress, bossProgress, userXp
   ]);
 
   // Throttling references for scrolling engine
@@ -1689,7 +1751,7 @@ export default function App() {
     const finalDrillText = drillParts.slice(0, 20).join(' ');
 
     const remediationLesson: Lesson = {
-      id: 9999,
+      id: 7777,
       name: `🔧 Key Repair Drill ('${topKeys.join(', ').toUpperCase()}')`,
       keys: topKeys,
       desc: `Targeted muscle memory repair for key(s): ${topKeys.join(', ').toUpperCase()}`,
@@ -1743,6 +1805,48 @@ export default function App() {
     localStorage.setItem("ranked_title", getRankedTitle(globalStats.bestWpm));
   }, [globalStats.bestWpm]);
 
+  // Persist XP whenever it changes
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('ribbon_user_xp', String(userXp));
+    }
+  }, [userXp]);
+
+  // Award XP for a completed session and surface level-up toasts.
+  // Computed from userXpRef to stay pure (no setState-updater side effects).
+  const awardXp = useCallback((wpm: number, accuracy: number) => {
+    const gained = Math.max(10, Math.round(wpm * 0.5 + accuracy * 0.15));
+    const prevXp = userXpRef.current;
+    const nextXp = prevXp + gained;
+    userXpRef.current = nextXp;
+    setUserXp(nextXp);
+    if (Math.floor(nextXp / 500) > Math.floor(prevXp / 500)) {
+      addToast(`Level ${Math.floor(nextXp / 500) + 1} reached!`, 'You leveled up — keep typing!', 'levelup');
+    }
+  }, [addToast]);
+
+  // Stable callbacks for the memoized RightSidebarWidgets
+  const handleScriptToggle = useCallback((script: 'english' | 'hindi') => {
+    setCurrentScript(script);
+    sfx.playClick();
+  }, []);
+
+  const handleLayoutToggle = useCallback(() => {
+    const nextLayout = keyboardLayout === 'qwerty' ? 'dvorak' : keyboardLayout === 'dvorak' ? 'colemak' : 'qwerty';
+    setKeyboardLayout(nextLayout);
+    sfx.playClick();
+  }, [keyboardLayout]);
+
+  const handleOpenLeaderboard = useCallback(() => {
+    setActiveModal('leaderboard');
+    sfx.playClick();
+  }, []);
+
+  const handleOpenAchievements = useCallback(() => {
+    setActiveModal('achievements');
+    sfx.playClick();
+  }, []);
+
   // Timed test completion logic
   const handleTimedTestCompletion = useCallback((finalTyped: string, finalTarget: string) => {
     if (backspaceClusterRef.current > 0) {
@@ -1770,6 +1874,9 @@ export default function App() {
     const accuracy = finalTyped.length > 0 ? Math.round((correctsCount / finalTyped.length) * 100) : 100;
     const finalAccuracy = Math.min(100, Math.max(0, accuracy));
     const finalWpm = Math.round((finalTyped.length / 5) / (testDuration / 60));
+
+    // Award XP for the timed session
+    awardXp(finalWpm, finalAccuracy);
 
     // Save history
     const sessionItem: SessionHistoryItem = {
@@ -1807,12 +1914,19 @@ export default function App() {
       };
     });
 
-    // Award streak increment (once per calendar day)
+    // Award streak increment (once per calendar day, continue only if yesterday)
     {
       const today = new Date().toDateString();
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
       const lastStreakDate = localStorage.getItem("ribbon_last_streak_date");
-      if (lastStreakDate !== today) {
+      if (lastStreakDate === today) {
+        // Already counted for today
+      } else if (lastStreakDate === yesterday) {
         setStreak(s => s + 1);
+        localStorage.setItem("ribbon_last_streak_date", today);
+      } else {
+        // Gap of 2+ days (or first session): start a fresh streak
+        setStreak(1);
         localStorage.setItem("ribbon_last_streak_date", today);
       }
     }
@@ -1836,20 +1950,6 @@ export default function App() {
       const nextWordsTyped = basePrev.wordsTyped + wordsEarned;
       const nextBestWpm = Math.max(basePrev.bestWpmToday, finalWpm);
 
-      const wasCompletedBefore = basePrev.practiceMin >= dailyGoals.practiceMin &&
-        basePrev.wordsTyped >= dailyGoals.wordsTyped &&
-        basePrev.bestWpmToday >= dailyGoals.targetWpm;
-
-      const isCompletedNow = nextPracticeMin >= dailyGoals.practiceMin &&
-        nextWordsTyped >= dailyGoals.wordsTyped &&
-        nextBestWpm >= dailyGoals.targetWpm;
-
-      if (isCompletedNow && !wasCompletedBefore) {
-        setGoalsStreak(s => s + 1);
-        setGoalToast("🎉 Daily Practice Goals Completed! Streak extended!");
-        setTimeout(() => setGoalToast(null), 5000);
-      }
-
       return {
         practiceMin: nextPracticeMin,
         wordsTyped: nextWordsTyped,
@@ -1863,7 +1963,27 @@ export default function App() {
       action: `scored ${finalWpm} WPM on a ${Math.round(testDuration / 60)}-minute timed test!`,
       timestamp: new Date().toISOString()
     }, ...prev].slice(0, 30));
-  }, [testDuration, startTime, dailyGoals]);
+  }, [testDuration, startTime, dailyGoals, awardXp]);
+
+  // Detect daily-goal completion once per crossing and award the streak + toast.
+  // Detection lives OUTSIDE the setDailyGoalsProgress updaters so side effects
+  // never run twice under React's double-invocation.
+  const goalCompletionHandledRef = useRef(false);
+  useEffect(() => {
+    const done = dailyGoalsProgress.practiceMin >= dailyGoals.practiceMin &&
+      dailyGoalsProgress.wordsTyped >= dailyGoals.wordsTyped &&
+      dailyGoalsProgress.bestWpmToday >= dailyGoals.targetWpm;
+    if (done) {
+      if (!goalCompletionHandledRef.current) {
+        goalCompletionHandledRef.current = true;
+        setGoalsStreak(s => s + 1);
+        setGoalToast("🎉 Daily Practice Goals Completed! Streak extended!");
+        setTimeout(() => setGoalToast(null), 5000);
+      }
+    } else {
+      goalCompletionHandledRef.current = false;
+    }
+  }, [dailyGoalsProgress, dailyGoals]);
 
   // Next expected key for visual keyboard highlights — memoized to avoid recomputing on every render
   const nextExpectedChar = useMemo(() => targetText[typedText.length] || null, [targetText, typedText.length]);
@@ -1917,8 +2037,8 @@ export default function App() {
   };
 
   const handleOpponentWin = (type: 'bot' | 'boss') => {
-    // Calculate user's stats
-    const durationSec = elapsed > 0.5 ? elapsed : 0.5;
+    // Calculate user's stats (use ref so it reflects the latest tick even when called from the interval)
+    const durationSec = (elapsedRef.current || 0) > 0.5 ? elapsedRef.current : 0.5;
     let correctsCount = 0;
     const currentTyped = typedTextRef.current;
     const currentTarget = targetTextRef.current;
@@ -1955,51 +2075,58 @@ export default function App() {
   };
 
   // Active workout clock (Tick-based to safely support pausing without clock jumping)
+  // Computes the next tick via refs and triggers completion logic OUTSIDE of setState updaters,
+  // so completion/opponent-win flows never run twice under React's double-invocation.
   useEffect(() => {
     let interval: any;
     if (startTime && !workoutCompleted && !arcadeActive && !isPaused && !timedEndModalOpen && !raceEndModalOpen) {
       interval = setInterval(() => {
-        setElapsed(prev => {
-          const next = prev + 0.25;
-          if (testDuration !== null && next >= testDuration) {
+        const nextElapsed = (elapsedRef.current || 0) + 0.25;
+
+        // Timed test completed
+        if (testDuration !== null && nextElapsed >= testDuration) {
+          elapsedRef.current = testDuration;
+          setElapsed(testDuration);
+          clearInterval(interval);
+          setTimedEndModalOpen(true);
+          playCompletionSound();
+          analyzeKeystrokes(); // Calculate slowest bi-gram and trigger coach drill
+          handleTimedTestCompletion(typedTextRef.current, targetTextRef.current);
+          return;
+        }
+
+        // Bot and adaptive boss progress increments
+        if (botRaceActive && targetText.length > 0) {
+          const nextBot = (botProgressRef.current || 0) + (botWpm * 5 / 60) * 0.25;
+          if (nextBot >= targetText.length) {
+            botProgressRef.current = targetText.length;
+            setBotProgress(targetText.length);
             clearInterval(interval);
-            setTimedEndModalOpen(true);
-            playCompletionSound();
-            analyzeKeystrokes(); // Calculate slowest bi-gram and trigger coach drill
-            handleTimedTestCompletion(typedTextRef.current, targetTextRef.current);
-            return testDuration;
+            handleOpponentWin('bot');
+            return;
           }
+          botProgressRef.current = nextBot;
+          setBotProgress(nextBot);
+        } else if (adaptiveBossActive && targetText.length > 0) {
+          // Live user WPM calculation
+          const liveUserWpm = nextElapsed > 0 ? (typedTextRef.current.length / 5) / (nextElapsed / 60) : 0;
+          const liveBossWpm = Math.max(30, liveUserWpm * 0.85);
+          setBossWpm(Math.round(liveBossWpm));
 
-          // Bot and adaptive boss progress increments
-          if (botRaceActive && targetText.length > 0) {
-            setBotProgress(curr => {
-              const nextBot = curr + (botWpm * 5 / 60) * 0.25;
-              if (nextBot >= targetText.length) {
-                clearInterval(interval);
-                handleOpponentWin('bot');
-                return targetText.length;
-              }
-              return nextBot;
-            });
-          } else if (adaptiveBossActive && targetText.length > 0) {
-            // Live user WPM calculation
-            const liveUserWpm = next > 0 ? (typedTextRef.current.length / 5) / (next / 60) : 0;
-            const liveBossWpm = Math.max(30, liveUserWpm * 0.85);
-            setBossWpm(Math.round(liveBossWpm));
-
-            setBossProgress(curr => {
-              const nextBoss = curr + (liveBossWpm * 5 / 60) * 0.25;
-              if (nextBoss >= targetText.length) {
-                clearInterval(interval);
-                handleOpponentWin('boss');
-                return targetText.length;
-              }
-              return nextBoss;
-            });
+          const nextBoss = (bossProgressRef.current || 0) + (liveBossWpm * 5 / 60) * 0.25;
+          if (nextBoss >= targetText.length) {
+            bossProgressRef.current = targetText.length;
+            setBossProgress(targetText.length);
+            clearInterval(interval);
+            handleOpponentWin('boss');
+            return;
           }
+          bossProgressRef.current = nextBoss;
+          setBossProgress(nextBoss);
+        }
 
-          return next;
-        });
+        elapsedRef.current = nextElapsed;
+        setElapsed(nextElapsed);
       }, 250);
     }
     return () => clearInterval(interval);
@@ -2287,15 +2414,8 @@ export default function App() {
         sfx.playClick(key === ' ' || key === 'Enter', false);
         // URGENT: just update text
         setTypingState(prev => ({ ...prev, typedText: prev.typedText + charToCompare }));
-        // LOW PRIORITY: update stats
-        startStatsTransition(() => {
-          setTypingState(prev => ({
-            ...prev,
-            physicalKeyPresses: physicalCode
-              ? { ...prev.physicalKeyPresses, [physicalCode]: (prev.physicalKeyPresses[physicalCode] || 0) + 1 }
-              : prev.physicalKeyPresses,
-          }));
-        });
+        // Stats are coalesced (ref, flushed on a throttle — no per-keystroke render)
+        if (physicalCode) queuePendingStat('physicalKeyPresses', physicalCode);
       } else {
         // Normal Mode
         const expectedChar = targetText[typedText.length];
@@ -2314,16 +2434,9 @@ export default function App() {
               return next;
             })(),
           }));
-          // Stats are low priority
-          startStatsTransition(() => {
-            setTypingState(prev => ({
-              ...prev,
-              fumbles: { ...prev.fumbles, [charKey]: (prev.fumbles[charKey] || 0) + 1 },
-              physicalKeyErrors: physicalCode
-                ? { ...prev.physicalKeyErrors, [physicalCode]: (prev.physicalKeyErrors[physicalCode] || 0) + 1 }
-                : prev.physicalKeyErrors,
-            }));
-          });
+          // Stats are coalesced (ref, flushed on a throttle — no per-keystroke render)
+          queuePendingStat('fumbles', charKey);
+          if (physicalCode) queuePendingStat('physicalKeyErrors', physicalCode);
           return;
         }
 
@@ -2372,24 +2485,12 @@ export default function App() {
           return next;
         });
 
-        // LOW PRIORITY: update stats — React can interrupt these if a new keystroke arrives
-        startStatsTransition(() => {
-          setTypingState(prev => {
-            const next: typeof prev = { ...prev };
-            if (physicalCode) {
-              next.physicalKeyPresses = { ...prev.physicalKeyPresses, [physicalCode]: (prev.physicalKeyPresses[physicalCode] || 0) + 1 };
-            }
-            if (!isCorrect) {
-              if (physicalCode) {
-                next.physicalKeyErrors = { ...prev.physicalKeyErrors, [physicalCode]: (prev.physicalKeyErrors[physicalCode] || 0) + 1 };
-              }
-              if (charToCompare.match(/^[a-zA-Z0-9;,.?!\n ]$/)) {
-                next.fumbles = { ...prev.fumbles, [charKey]: (prev.fumbles[charKey] || 0) + 1 };
-              }
-            }
-            return next;
-          });
-        });
+        // Stats are coalesced (ref, flushed on a throttle — no per-keystroke render)
+        if (physicalCode) queuePendingStat('physicalKeyPresses', physicalCode);
+        if (!isCorrect) {
+          if (physicalCode) queuePendingStat('physicalKeyErrors', physicalCode);
+          if (charToCompare.match(/^[a-zA-Z0-9;,.?!\n ]$/)) queuePendingStat('fumbles', charKey);
+        }
 
         // Clear punishment after 200ms (infrequent)
         if (punishedIdx !== null) {
@@ -2505,6 +2606,9 @@ export default function App() {
             // Industry-standard: correct chars / total chars typed (matches timed mode formula)
             const accuracy = newTyped.length > 0 ? Math.round((correctsCount / newTyped.length) * 100) : 100;
             const wpm = Math.round((newTyped.length / 5) / (durationSec / 60));
+
+            // Award XP for the completed session (also covers race wins)
+            awardXp(wpm, accuracy);
 
             if (botRaceActive || adaptiveBossActive) {
               setWorkoutCompleted(true);
@@ -2634,12 +2738,19 @@ export default function App() {
               };
             });
 
-            // Award streak increment (once per calendar day)
+            // Award streak increment (once per calendar day, continue only if yesterday)
             {
               const today = new Date().toDateString();
+              const yesterday = new Date(Date.now() - 86400000).toDateString();
               const lastStreakDate = localStorage.getItem("ribbon_last_streak_date");
-              if (lastStreakDate !== today) {
+              if (lastStreakDate === today) {
+                // Already counted for today
+              } else if (lastStreakDate === yesterday) {
                 setStreak(s => s + 1);
+                localStorage.setItem("ribbon_last_streak_date", today);
+              } else {
+                // Gap of 2+ days (or first session): start a fresh streak
+                setStreak(1);
                 localStorage.setItem("ribbon_last_streak_date", today);
               }
             }
@@ -2657,20 +2768,6 @@ export default function App() {
               const nextPracticeMin = basePrev.practiceMin + minutesEarned;
               const nextWordsTyped = basePrev.wordsTyped + wordsEarned;
               const nextBestWpm = Math.max(basePrev.bestWpmToday, wpm);
-
-              const wasCompletedBefore = basePrev.practiceMin >= dailyGoals.practiceMin &&
-                basePrev.wordsTyped >= dailyGoals.wordsTyped &&
-                basePrev.bestWpmToday >= dailyGoals.targetWpm;
-
-              const isCompletedNow = nextPracticeMin >= dailyGoals.practiceMin &&
-                nextWordsTyped >= dailyGoals.wordsTyped &&
-                nextBestWpm >= dailyGoals.targetWpm;
-
-              if (isCompletedNow && !wasCompletedBefore) {
-                setGoalsStreak(s => s + 1);
-                setGoalToast("🎉 Daily Practice Goals Completed! Streak extended!");
-                setTimeout(() => setGoalToast(null), 5000);
-              }
 
               return {
                 practiceMin: nextPracticeMin,
@@ -2716,6 +2813,12 @@ export default function App() {
       localStorage.setItem('backspaceClusters', JSON.stringify(updatedClusters));
       backspaceClusterRef.current = 0;
       backspaceClusterStartRef.current = -1;
+    }
+
+    pendingStatsRef.current = { physicalKeyPresses: {}, physicalKeyErrors: {}, fumbles: {} };
+    if (statsFlushTimerRef.current !== null) {
+      clearTimeout(statsFlushTimerRef.current);
+      statsFlushTimerRef.current = null;
     }
 
     let nextText = currentLesson.customText || "";
@@ -3002,7 +3105,7 @@ export default function App() {
     setWeeklyChallengeLoading(true);
     sfx.playClick();
 
-    const weekId = `week_${Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000))}`;
+    const weekId = getCurrentWeekId();
     let challengeStory = "";
 
     try {
@@ -3034,8 +3137,8 @@ export default function App() {
     setWeeklyChallengePB(pb);
 
     const lb = getLeaderboardForWeek(weekId);
+    const userIndex = lb.findIndex((item: any) => item.isUser);
     if (pb) {
-      const userIndex = lb.findIndex((item: any) => item.isUser);
       if (userIndex >= 0) {
         lb[userIndex].wpm = Math.max(lb[userIndex].wpm, pb.wpm);
         lb[userIndex].accuracy = Math.max(lb[userIndex].accuracy, pb.accuracy);
@@ -3043,9 +3146,12 @@ export default function App() {
       } else {
         lb.push({ name: username, wpm: pb.wpm, accuracy: pb.accuracy, isUser: true });
       }
-      lb.sort((a: any, b: any) => b.wpm - a.wpm || b.accuracy - a.accuracy);
-      localStorage.setItem(`ribbon_weekly_leaderboard_${weekId}`, JSON.stringify(lb));
+    } else if (userIndex < 0) {
+      // No PB yet — still surface the user's row so they appear on the board
+      lb.push({ name: username, wpm: 0, accuracy: 0, isUser: true });
     }
+    lb.sort((a: any, b: any) => b.wpm - a.wpm || b.accuracy - a.accuracy);
+    localStorage.setItem(`ribbon_weekly_leaderboard_${weekId}`, JSON.stringify(lb));
     setWeeklyLeaderboard(lb);
     setWeeklyChallengeLoading(false);
   };
@@ -3077,7 +3183,11 @@ export default function App() {
 
   // Helper: Retrieve top 3 fumbles
   const getTopFumbles = () => {
-    const sorted = Object.entries(fumbles)
+    const combined = { ...fumbles };
+    for (const [k, v] of Object.entries(pendingStatsRef.current.fumbles)) {
+      combined[k] = (combined[k] || 0) + v;
+    }
+    const sorted = Object.entries(combined)
       .filter(([char]) => char.match(/^[a-z]$/i))
       .sort((a, b) => (b[1] as number) - (a[1] as number))
       .slice(0, 3);
@@ -3308,8 +3418,8 @@ export default function App() {
         return {
           bg: '#0B0C10',
           text: '#C5C6C7',
-          cursor: '#00F0FF',
-          accent: '#00F0FF',
+          cursor: '#F59E0B',
+          accent: '#F59E0B',
           error: '#FF4444',
           correct: '#10B981',
           rootBg: 'radial-gradient(circle at center, #141A26 0%, #0B0C10 100%)'
@@ -3321,11 +3431,11 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen text-[#C5C6C7] flex items-stretch xl:overflow-hidden font-sans relative selection:bg-[#00F0FF] selection:text-[#0B0C10]"
+      className="min-h-screen text-[#C5C6C7] flex items-stretch xl:overflow-hidden font-sans relative selection:bg-[#F59E0B] selection:text-[#0B0C10]"
       style={{ background: themeConfig.rootBg }}
     >
       {goalToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#141419] border-2 border-[#00F0FF] p-4 rounded-[16px] shadow-[0_0_25px_rgba(0,240,255,0.25)] max-w-sm flex items-center gap-3 animate-bounce">
+        <div className="fixed bottom-6 right-6 z-50 bg-[#141419] border-2 border-[#F59E0B] p-4 rounded-[16px] shadow-[0_0_25px_rgba(245,158,11,0.25)] max-w-sm flex items-center gap-3 animate-bounce">
           <div className="text-2xl">🏆</div>
           <p className="text-xs text-white font-mono leading-tight whitespace-pre-line">{goalToast}</p>
         </div>
@@ -3339,44 +3449,6 @@ export default function App() {
           --theme-error: ${themeConfig.error};
           --theme-correct: ${themeConfig.correct};
         }
-        @media (max-width: 768px) {
-          .mobile-settings-bar {
-            overflow: hidden !important;
-            max-width: 100vw !important;
-            padding-left: 4px !important;
-            padding-right: 4px !important;
-          }
-          .mobile-pill-wrapper {
-            display: flex !important;
-            flex-wrap: wrap !important;
-            gap: 2px !important;
-            justify-content: center !important;
-          }
-          .mobile-pill {
-            font-size: 7px !important;
-            padding: 2px 4px !important;
-            white-space: nowrap !important;
-            flex-shrink: 0 !important;
-          }
-          .mobile-progress-container {
-            display: flex !important;
-            justify-content: center !important;
-            align-items: center !important;
-            width: 100% !important;
-            max-height: 32px !important;
-            overflow: hidden !important;
-          }
-          .mobile-progress-circle {
-            width: 100% !important;
-            height: 6px !important;
-            margin: 0 auto !important;
-            position: relative !important;
-            top: auto !important;
-            left: auto !important;
-            margin-top: 0 !important;
-            margin-bottom: 0 !important;
-          }
-        }
       `}</style>
 
       {/* 1. RESPONSIVE SIDEBAR SYSTEM */}
@@ -3384,7 +3456,7 @@ export default function App() {
 
       <aside
         className={`
-          hidden xl:flex
+          hidden lg:flex
           ${sidebarExpanded ? 'w-[240px]' : 'w-[64px]'}
           flex-col justify-between items-stretch py-6 select-none bg-[#0D0F1A]/95 border-r border-zinc-800/80 shadow-2xl backdrop-blur-xl transition-all duration-300 ease-in-out shrink-0 h-screen z-50 relative
         `}
@@ -3551,7 +3623,7 @@ export default function App() {
               {sidebarExpanded && (
                 <div className="flex items-center justify-between w-full">
                   <span className="text-xs font-semibold tracking-wide">Retro Arcade</span>
-                  <span className="text-[8px] font-mono px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/40 font-bold">HOT 🔥</span>
+                  <span className="text-[8px] font-mono px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/40 font-bold">HOT</span>
                 </div>
               )}
             </button>
@@ -3698,7 +3770,7 @@ export default function App() {
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-bold text-zinc-200 truncate">Typist Rank</span>
                   <span className="text-[10px] font-mono text-amber-400 font-bold flex items-center gap-1">
-                    🔥 Lv. 1 · {streak}D Streak
+                    <Flame className="w-3 h-3" /> Lv. 1 · {streak}D Streak
                   </span>
                 </div>
               </div>
@@ -3733,1357 +3805,43 @@ export default function App() {
       </aside>
 
       {/* 2. CENTRE SCROLLABLE MAIN LAYOUT (Dominant center) */}
-      <main className="flex-1 flex flex-col min-w-0 xl:h-screen xl:overflow-hidden overflow-y-auto relative select-none">
+      <main className="flex-1 flex flex-col min-w-0 lg:h-screen lg:overflow-hidden overflow-y-auto relative select-none">
 
-        {/* MOBILE COLLAPSIBLE TOP PANEL & PERSISTENT NAVBAR */}
-        {!arcadeActive && (
-          <div className="xl:hidden flex flex-col w-full relative z-30 select-none">
-            {/* A. Persistent Top Navigation Bar */}
-            <div
-              className="h-10 shrink-0 flex items-center justify-between px-4 border-b border-zinc-800/60 bg-[#1F2833]/15 backdrop-blur-md"
-              style={{ height: '40px' }}
-            >
-              <div className="flex items-center gap-2">
-                {/* Hamburger Menu Button (☰) */}
-                <button
-                  onClick={() => {
-                    setMobileDrawerOpen(true);
-                    sfx.playClick();
-                  }}
-                  className="hover:bg-[#00F0FF]/10 active:bg-[#00F0FF]/10 text-zinc-400 hover:text-[#00F0FF] active:text-[#00F0FF] transition-all cursor-pointer flex items-center justify-center rounded-lg"
-                  style={{
-                    padding: '4px',
-                    width: '28px',
-                    height: '28px'
-                  }}
-                  title="Menu"
-                >
-                  <Menu size={18} />
-                </button>
 
-                {/* Ribbon Logo */}
-                <span
-                  onClick={() => {
-                    setMobileDrawerOpen(true);
-                    sfx.playClick();
-                  }}
-                  className="font-sans text-base font-black bg-gradient-to-r from-[#FF6B35] via-[#FF007F] to-[#00F0FF] text-transparent bg-clip-text tracking-tighter cursor-pointer hover:opacity-95 transition-opacity"
-                >
-                  Ribbon
-                </span>
-
-                {/* Live Timer (MM:SS) */}
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-[12px] bg-[#0B0C10]/60 border border-zinc-800 text-[10px] font-mono font-bold text-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.1)]">
-                  <span className="text-zinc-400">⏱️</span>
-                  <span>{formatTimer(testDuration !== null ? Math.max(0, testDuration - elapsed) : elapsed)}</span>
-                </div>
-
-                {/* '🔥 8 Day Streak' badge */}
-                <div className="flex items-center gap-1.5 bg-[#0B0C10]/60 border border-zinc-800 px-2 py-0.5 rounded-[12px] text-[10px] font-mono font-bold text-[#FF6B35] shadow-[0_0_10px_rgba(255,107,53,0.1)]">
-                  <span>🔥</span>
-                  <span>{streak}</span>
-                </div>
-              </div>
-
-              {/* Mobile Navigation Icons */}
-              <div className="flex items-center gap-1.5">
-                {/* Share Button (📸) */}
-                <div className="relative">
-                  <button
-                    onClick={handleShare}
-                    className="hover:bg-[#00F0FF]/10 active:bg-[#00F0FF]/10 text-zinc-400 hover:text-[#00F0FF] active:text-[#00F0FF] transition-all cursor-pointer flex items-center justify-center rounded-lg"
-                    style={{ width: '28px', height: '28px' }}
-                    title="Share Badge"
-                  >
-                    <span className="text-sm">📸</span>
-                  </button>
-                  {shareFeedback && (
-                    <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-[#00F0FF] text-zinc-950 text-[9px] font-mono font-extrabold rounded shadow-md z-50 whitespace-nowrap">
-                      {shareFeedback}
-                    </span>
-                  )}
-                </div>
-
-                {/* Fullscreen Toggle */}
-                <button
-                  onClick={() => {
-                    toggleFullscreen();
-                    sfx.playClick();
-                  }}
-                  className="hover:bg-[#00F0FF]/10 active:bg-[#00F0FF]/10 text-zinc-400 hover:text-[#00F0FF] active:text-[#00F0FF] transition-all cursor-pointer flex items-center justify-center rounded-lg"
-                  style={{
-                    width: '28px',
-                    height: '28px'
-                  }}
-                  title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-                >
-                  {isFullscreen ? (
-                    <Minimize className="w-4 h-4" />
-                  ) : (
-                    <Maximize className="w-4 h-4" />
-                  )}
-                </button>
-
-                {/* Sound Toggle */}
-                <button
-                  onClick={() => {
-                    setSoundEnabled(!soundEnabled);
-                    sfx.playClick();
-                  }}
-                  className="hover:bg-[#00F0FF]/10 active:bg-[#00F0FF]/10 text-zinc-400 hover:text-[#00F0FF] active:text-[#00F0FF] transition-all cursor-pointer flex items-center justify-center rounded-lg"
-                  style={{
-                    width: '28px',
-                    height: '28px'
-                  }}
-                  title={soundEnabled ? "Mute" : "Unmute"}
-                >
-                  {soundEnabled ? <Volume2 size={16} className="text-[#00F0FF]" /> : <VolumeX size={16} />}
-                </button>
-              </div>
-            </div>
-
-            {/* B. Settings/Control Panel Content */}
-            <div
-              className="flex flex-col w-full bg-[#1F2833]/15 backdrop-blur-md select-none transition-all duration-300 ease-in-out border-b border-zinc-800/40"
-              style={{
-                maxHeight: isPanelCollapsed ? '0px' : '450px',
-                overflow: isPanelCollapsed ? 'hidden' : 'auto',
-                opacity: isPanelCollapsed ? 0 : 1,
-                borderBottomWidth: isPanelCollapsed ? '0px' : '1px'
-              }}
-            >
-              <div className="flex-1 flex flex-col p-3 gap-3 overflow-y-auto scrollbar-none pb-12">
-
-                {/* 2. STATS ROW (RIBBON STATS BAR) */}
-                {zenMode ? (
-                  <div className="w-full flex items-center justify-between p-2.5 bg-[#0F1D1A] border border-[#45A29E]/30 rounded-xl text-[10px] font-mono text-[#45A29E] animate-pulse">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-[#45A29E] shadow-[0_0_8px_#45A29E]" />
-                      <span className="font-sans font-bold uppercase tracking-wide">🧘 ZEN MODE IN PROGRESS</span>
-                    </div>
-                    <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">
-                      NO DISTRACTIONS · FOCUS WITHIN
-                    </div>
-                  </div>
-                ) : (
-                  <div className="w-full flex flex-col gap-1.5 p-2 bg-[#1F2833]/30 border border-zinc-800 rounded-xl text-[9px] font-mono">
-                    <div className="flex items-center gap-1.5 font-sans font-bold text-zinc-400 uppercase tracking-wide text-[8px]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#45A29E] animate-pulse" />
-                      <span className="truncate">{freestyleMode ? "📝 FREESTYLE CANVAS" : currentLesson.name}</span>
-                    </div>
-
-                    <div className="flex flex-row flex-wrap gap-1">
-                      {/* Benchmark */}
-                      <div className="bg-[#0B0C10]/80 border border-[#FF6B35]/30 px-2 py-0.5 rounded-full text-[#FF6B35] font-black">
-                        BM: {speedTarget} WPM
-                      </div>
-                      {/* Live Speed */}
-                      <div className="bg-[#0B0C10]/80 border border-[#00F0FF]/30 px-2 py-0.5 rounded-full text-[#00F0FF] font-black">
-                        LIVE: {liveWpm} WPM
-                      </div>
-                      {/* Accuracy */}
-                      <div className="bg-[#0B0C10]/80 border border-[#45A29E]/30 px-2 py-0.5 rounded-full text-[#45A29E] font-black">
-                        ACC: {freestyleMode ? "--" : (typedText.length > 0
-                          ? `${liveAccuracy}%`
-                          : "100%")}
-                      </div>
-                      {/* PB/Ghost */}
-                      <div className="bg-[#0B0C10]/80 border border-zinc-700 px-2 py-0.5 rounded-full text-zinc-400 font-black">
-                        {ghostTimestamps.length > 0 ? `👻 GHOST: ${ghostPbWpm} PB` : "👻 PB: NONE"}
-                      </div>
-                      {/* Historical Avg */}
-                      <div className="bg-[#0B0C10]/80 border border-zinc-800 px-2 py-0.5 rounded-full text-zinc-400 font-black">
-                        HIST: {globalStats.avgWpm || 0} WPM
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. AI STORY GENERATOR & WEAKNESS COACHING TOGGLES & CONTAINERS */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        setAiStoryOpen(!aiStoryOpen);
-                        sfx.playClick();
-                      }}
-                      className={`flex-1 py-1 rounded-lg text-[8px] font-mono font-black uppercase tracking-wider flex items-center justify-center gap-1 border ${aiStoryOpen
-                          ? 'bg-[#00F0FF]/15 border-[#00F0FF]/40 text-[#00F0FF]'
-                          : 'bg-[#1F2833]/10 border-zinc-850/60 text-zinc-400'
-                        }`}
-                    >
-                      <Sparkles className="w-3 h-3" />
-                      <span>AI Story {aiStoryOpen ? '▲' : '▼'}</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setWeaknessOpen(!weaknessOpen);
-                        sfx.playClick();
-                      }}
-                      className={`flex-1 py-1 rounded-lg text-[8px] font-mono font-black uppercase tracking-wider flex items-center justify-center gap-1 border ${weaknessOpen
-                          ? 'bg-[#FF6B35]/15 border-[#FF6B35]/40 text-[#FF6B35]'
-                          : 'bg-[#1F2833]/10 border-zinc-850/60 text-zinc-400'
-                        }`}
-                    >
-                      <Activity className="w-3 h-3" />
-                      <span>Weakness {weaknessOpen ? '▲' : '▼'}</span>
-                    </button>
-                  </div>
-
-                  {/* AI Story input if open */}
-                  {aiStoryOpen && (
-                    <div className="bg-[#1F2833]/15 border border-zinc-900 rounded-lg p-2 flex flex-col gap-2">
-                      <div className="flex items-center gap-1 text-zinc-300">
-                        <Sparkles className="w-3 h-3 text-[#00F0FF] animate-pulse" />
-                        <span className="text-[8px] font-mono uppercase tracking-widest font-black text-[#00F0FF]">AI Story Generator</span>
-                      </div>
-                      {/* Duration selector */}
-                      <div className="flex gap-1">
-                        {[2, 5, 10, 15].map(d => (
-                          <button
-                            key={d}
-                            onClick={() => setStoryDuration(d)}
-                            disabled={storyGenerating}
-                            className={`flex-1 py-0.5 rounded text-[8px] font-mono font-black border transition-all ${storyDuration === d
-                                ? 'bg-[#00F0FF]/20 border-[#00F0FF] text-[#00F0FF]'
-                                : 'bg-transparent border-zinc-700 text-zinc-500 hover:border-zinc-500'
-                              }`}
-                          >{d}m</button>
-                        ))}
-                      </div>
-                      <div className="flex gap-1.5">
-                        <input
-                          type="text"
-                          placeholder="Enter topic..."
-                          value={storyTopic}
-                          onChange={(e) => setStoryTopic(e.target.value)}
-                          disabled={storyGenerating}
-                          className="flex-1 bg-[#0B0C10]/95 border border-zinc-850 text-[#C5C6C7] rounded px-2 py-1 text-[9px] font-mono focus:outline-none"
-                        />
-                        <button
-                          onClick={generateAIStory}
-                          disabled={storyGenerating || !storyTopic.trim()}
-                          className={`px-3 py-1 rounded text-[9px] font-mono font-black uppercase transition-all border ${storyGenerating
-                              ? 'bg-[#00F0FF]/10 border-[#00F0FF] text-[#00F0FF] animate-pulse'
-                              : storyTopic.trim()
-                                ? 'bg-[#00F0FF]/20 border-[#00F0FF] text-[#00F0FF]'
-                                : 'bg-[#1F2833]/5 border-zinc-850 text-zinc-500 cursor-not-allowed'
-                            }`}
-                        >
-                          {storyGenerating ? '...' : 'Gen 🔮'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Weakness Coaching if open */}
-                  {weaknessOpen && (
-                    <div className="bg-[#FF6B35]/5 border border-[#FF6B35]/20 rounded-lg p-3 flex flex-col gap-2.5 text-[9px] relative overflow-hidden">
-                      {/* Focus Badge display if earned */}
-                      {focusBadgeEarned && (
-                        <div className="absolute top-2.5 right-2 px-1.5 py-0.5 rounded-full bg-[#FF6B35]/20 border border-[#FF6B35] flex items-center gap-1 shadow-[0_0_10px_rgba(255,107,53,0.3)] animate-pulse">
-                          <span className="text-[7px] font-mono text-[#FF6B35] font-black tracking-widest uppercase flex items-center gap-0.5">
-                            🎯 FOCUS BADGE
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-1">
-                        <Activity className="w-3.5 h-3.5 text-[#FF6B35]" />
-                        <span className="font-mono uppercase tracking-widest font-black text-[#FF6B35] text-[10px]">Weakness Analyzer</span>
-                      </div>
-
-                      {/* Proactive Analytics */}
-                      <div className="grid grid-cols-2 gap-2 border-t border-b border-zinc-800/80 py-2">
-                        {/* Top Fumbles */}
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[7px] font-mono text-zinc-500 uppercase font-bold tracking-wider">Top Fumbles</span>
-                          <div className="flex flex-col gap-0.5 font-mono text-[8px] text-zinc-300">
-                            {getTopFumbles().map((item, idx) => (
-                              <div key={idx} className="flex justify-between items-center bg-[#0B0C10]/60 border border-zinc-900 px-1 py-0.5 rounded">
-                                <span className="text-[#FF6B35] font-black uppercase">'{item.char}'</span>
-                                <span className="text-zinc-500">{item.count} errors</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Top Slowest Bigrams */}
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[7px] font-mono text-zinc-500 uppercase font-bold tracking-wider">Slowest Bigrams</span>
-                          <div className="flex flex-col gap-0.5 font-mono text-[8px] text-zinc-300">
-                            {getTopSlowestBigrams().map((item, idx) => (
-                              <div key={idx} className="flex justify-between items-center bg-[#0B0C10]/60 border border-zinc-900 px-1 py-0.5 rounded">
-                                <span className="text-[#00F0FF] font-black uppercase">{item.bigram}</span>
-                                <span className="text-zinc-500">{item.delay}ms</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Smart Drill Button */}
-                      <button
-                        onClick={generateSmartDrill}
-                        disabled={smartDrillGenerating}
-                        className={`w-full py-2 rounded font-mono font-black uppercase text-[8px] tracking-wider transition-all border shadow-lg ${smartDrillGenerating
-                            ? 'bg-[#FF6B35]/10 border-[#FF6B35] text-[#FF6B35] animate-pulse'
-                            : 'bg-[#FF6B35]/20 border-[#FF6B35] hover:bg-[#FF6B35]/30 text-[#FF6B35] cursor-pointer shadow-[#FF6B35]/10 hover:shadow-[#FF6B35]/20'
-                          }`}
-                      >
-                        {smartDrillGenerating ? '🧠 Generating Smart Drill...' : '🧠 Generate Smart Drill'}
-                      </button>
-
-                      {/* Single Sentence Weakness Coaching fallback */}
-                      {weaknessBigram && (
-                        <div className="bg-[#0B0C10]/50 border border-zinc-900 rounded p-1.5 flex flex-col gap-1 text-[8px]">
-                          <div className="flex justify-between font-mono text-[7px] text-zinc-500 uppercase font-black">
-                            <span>Focus Drill ('{weaknessBigram}')</span>
-                            <span>{weaknessDelay}ms delay</span>
-                          </div>
-                          <button
-                            onClick={practiceWeakness}
-                            disabled={sentenceGenerating || !weaknessSentence}
-                            className="w-full py-0.5 rounded font-mono font-black text-[7px] transition-all border bg-zinc-850/50 hover:bg-zinc-800 border-zinc-700 text-zinc-300 cursor-pointer"
-                          >
-                            Quick Single-Sentence Drill
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* 4. LESSON PROGRESS BAR */}
-                <div className="w-full select-none mt-1 space-y-1.5">
-                  <div>
-                    <div className="flex justify-between items-center text-[8px] font-mono text-zinc-400 mb-1">
-                      <span className="tracking-wider font-extrabold text-zinc-500 uppercase text-[8px]">Lesson Progress</span>
-                      <span className="text-[#00F0FF] font-black">
-                        {targetText.length > 0 ? Math.min(100, Math.round((typedText.length / targetText.length) * 100)) : 0}%
-                      </span>
-                    </div>
-                    <div className="mobile-progress-container relative overflow-hidden max-h-[40px] flex-shrink-0 w-full flex justify-center items-center">
-                      <div
-                        className="mobile-progress-circle w-full h-1.5 bg-[#1F2833]/40 rounded-full border border-zinc-850 relative m-0 shrink-0"
-                        style={{ position: 'relative', margin: '0 auto', flexShrink: 0 }}
-                      >
-                        <div
-                          className="h-full bg-gradient-to-r from-[#00F0FF] to-[#45A29E] shadow-[0_0_8px_#00F0FF] transition-all duration-200 rounded-full relative m-0"
-                          style={{ width: `${targetText.length > 0 ? Math.min(100, Math.round((typedText.length / targetText.length) * 100)) : 0}%`, position: 'relative', margin: '0 auto' }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {(botRaceActive || adaptiveBossActive) && (
-                    <div>
-                      <div className="flex justify-between items-center text-[8px] font-mono text-zinc-400 mb-1">
-                        <span className="tracking-wider font-extrabold text-[#FF6B35] uppercase text-[8px]">
-                          {botRaceActive ? "Bot" : "Boss"} Progress
-                        </span>
-                        <span className="text-[#FF6B35] font-black">
-                          {targetText.length > 0
-                            ? Math.min(100, Math.round(((botRaceActive ? botProgress : bossProgress) / targetText.length) * 100))
-                            : 0}%
-                        </span>
-                      </div>
-                      <div className="mobile-progress-container relative overflow-hidden max-h-[40px] flex-shrink-0 w-full flex justify-center items-center">
-                        <div
-                          className="mobile-progress-circle w-full h-1.5 bg-[#1F2833]/40 rounded-full border border-zinc-850 relative m-0 shrink-0"
-                          style={{ position: 'relative', margin: '0 auto', flexShrink: 0 }}
-                        >
-                          <div
-                            className="h-full bg-gradient-to-r from-[#FF6B35] to-[#FF3300] shadow-[0_0_8px_#FF6B35] transition-all duration-200 rounded-full relative m-0"
-                            style={{
-                              width: `${targetText.length > 0
-                                ? Math.min(100, Math.round(((botRaceActive ? botProgress : bossProgress) / targetText.length) * 100))
-                                : 0}%`,
-                              position: 'relative',
-                              margin: '0 auto'
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-              </div>
-            </div>
-
-            {/* C. Small Toggle Handle hanging below the navbar/panel */}
-            <button
-              onClick={() => {
-                setIsPanelCollapsed(!isPanelCollapsed);
-                localStorage.setItem('ribbon-panel-collapsed', String(!isPanelCollapsed));
-                sfx.playClick();
-              }}
-              className="absolute flex items-center justify-center w-8 h-8 rounded-lg border border-zinc-800/80 bg-[#1F2833]/95 text-[#00F0FF] transition-all hover:bg-[#00F0FF]/10 hover:shadow-[0_0_8px_rgba(0,240,255,0.2)] cursor-pointer shadow-lg z-30"
-              style={{
-                borderColor: 'rgba(0, 240, 255, 0.3)',
-                top: isPanelCollapsed ? '44px' : 'auto',
-                bottom: isPanelCollapsed ? 'auto' : '-16px',
-                right: '16px',
-              }}
-              title={isPanelCollapsed ? "Expand Control Panel" : "Collapse Control Panel"}
-            >
-              <span className="text-xs">
-                {isPanelCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-              </span>
-            </button>
-          </div>
-        )}
-
-        {/* COMPACT SETTINGS BAR (JUST BELOW THE NAVBAR) */}
-        {!arcadeActive && (
-          <div className="xl:hidden w-full overflow-x-auto scrollbar-none scroll-smooth overscroll-x-contain touch-pan-x bg-[#0D0F1A]/90 border-b border-zinc-800/80 px-4 md:px-6 py-2 flex flex-col gap-1.5 text-xs font-mono select-none backdrop-blur-xl z-10 shadow-md shrink-0 mobile-settings-bar" onWheel={handleHorizontalWheel}>
-            {/* Top Row: DURATION (left) and MODES (right) */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-2 w-full">
-              {/* Left side: Duration Row */}
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-center md:justify-start">
-                {/* Left side: Duration Row (Horizontal pills with separator lines) */}
-                <div className="flex flex-wrap gap-1 py-0.5 shrink-0 justify-center md:justify-start mobile-pill-wrapper" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
-                  <span className="text-[8px] md:text-[9px] sm:md:text-[10px] text-zinc-400 font-bold uppercase tracking-wider shrink-0">DURATION:</span>
-                  <div className="flex flex-wrap gap-1 bg-[#121422] p-1 rounded-xl border border-zinc-800/50 shrink-0 mobile-pill-wrapper" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
-                    {[
-                      { label: "1M", value: 60 },
-                      { label: "2M", value: 120 },
-                      { label: "5M", value: 300 },
-                      { label: "10M", value: 600 },
-                      { label: "15M", value: 900 },
-                      { label: "Unlimited", value: null }
-                    ].map((opt, idx) => (
-                      <React.Fragment key={opt.label}>
-                        {idx > 0 && <span className="text-zinc-700 text-[8px] md:text-[9px] select-none mx-0.5">|</span>}
-                        <button
-                          onClick={() => {
-                            setTestDuration(opt.value);
-                            selectStoryForDuration(opt.value);
-                            handleResetSession();
-                            sfx.playClick();
-                          }}
-                          className={`mobile-pill px-2 py-0.5 text-[8px] md:text-[9px] sm:md:text-[10px] font-mono font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 overflow-x-auto ${testDuration === opt.value
-                              ? 'bg-[#F59E0B]/20 text-[#F59E0B] font-extrabold border border-[#F59E0B]/50'
-                              : 'text-zinc-400 hover:text-white'
-                            }`}
-                        >
-                          {opt.label}
-                        </button>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right side: Compact Mode & Story Toolbar */}
-              <div className="flex flex-wrap gap-1 justify-center md:justify-end w-full md:w-auto py-0.5 mobile-pill-wrapper" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
-                <span className="text-[8px] md:text-[9px] sm:md:text-[10px] text-zinc-500 font-bold uppercase tracking-wider shrink-0 hidden lg:inline">MODE:</span>
-
-                {/* STANDARD */}
-                <button
-                  onClick={() => {
-                    setBotRaceActive(false);
-                    setAdaptiveBossActive(false);
-                    setFreestyleMode(false);
-                    handleModeChange("normal");
-                    setSelectedStoryId(null);
-                    const defaultL = (window.innerWidth >= 768)
-                      ? (LESSONS.find(l => l.id === 101) || LESSONS[0])
-                      : LESSONS[0];
-                    setCurrentLesson(defaultL);
-                    handleResetSession();
-                    sfx.playClick();
-                  }}
-                  className={`mobile-pill px-1.5 md:px-2.5 py-0.5 text-[8px] md:text-[9px] sm:md:text-[10px] font-mono font-black uppercase tracking-wider rounded-full border transition-all cursor-pointer whitespace-nowrap shrink-0 overflow-x-auto ${activeAppMode === 'normal' && !freestyleMode && !botRaceActive && !adaptiveBossActive && currentLesson.category !== 'Practice Stories'
-                      ? 'bg-[#00F0FF]/15 border-[#00F0FF]/40 text-[#00F0FF] shadow-[0_0_8px_rgba(0,240,255,0.15)]'
-                      : 'bg-[#1F2833]/10 border-zinc-850 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                >
-                  Standard
-                </button>
-
-                {/* AI STORY GENERATOR */}
-                <div className="relative inline-flex items-center gap-1 shrink-0">
-                  <button
-                    onClick={() => {
-                      setAiStoryOpen(!aiStoryOpen);
-                      sfx.playClick();
-                    }}
-                    className={`mobile-pill px-1.5 md:px-2.5 py-0.5 text-[8px] md:text-[9px] sm:md:text-[10px] font-mono font-black uppercase tracking-wider rounded-full border transition-all cursor-pointer whitespace-nowrap shrink-0 overflow-x-auto ${aiStoryOpen
-                        ? 'bg-[#00F0FF]/25 border-[#00F0FF] text-[#00F0FF] shadow-[0_0_8px_rgba(0,240,255,0.3)]'
-                        : 'bg-[#00F0FF]/10 border-[#00F0FF]/30 text-[#00F0FF]'
-                      }`}
-                  >
-                    ✨ AI Story {aiStoryOpen ? '▲' : '▼'}
-                  </button>
-
-                  {aiStoryOpen && (
-                    <div className="flex items-center gap-1 bg-[#0D0F1A] border border-[#00F0FF]/50 p-0.5 rounded-full shadow-[0_0_12px_rgba(0,240,255,0.3)] animate-in fade-in zoom-in-95 duration-150 shrink-0">
-                      <input
-                        type="text"
-                        placeholder="Topic..."
-                        value={storyTopic}
-                        onChange={(e) => setStoryTopic(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && storyTopic.trim() && !storyGenerating) {
-                            generateAIStory();
-                          }
-                        }}
-                        autoFocus
-                        disabled={storyGenerating}
-                        className="bg-[#141728] text-[#E8EDF5] text-[9px] font-mono px-2 py-0.5 rounded-full outline-none border border-[#252A48] focus:border-[#00F0FF] w-28 sm:w-36 placeholder:text-zinc-500 disabled:opacity-50"
-                      />
-                      <button
-                        onClick={generateAIStory}
-                        disabled={storyGenerating || !storyTopic.trim()}
-                        className="bg-[#00F0FF] text-[#0D0F1A] font-black text-[8px] font-mono px-2 py-0.5 rounded-full hover:bg-[#00F0FF]/90 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap"
-                      >
-                        {storyGenerating ? '...' : 'Go 🔮'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* BOT RACE */}
-                <button
-                  onClick={() => {
-                    setBotRaceActive(true);
-                    setAdaptiveBossActive(false);
-                    setFreestyleMode(false);
-                    setZenMode(false);
-                    setArcadeActive(false);
-                    handleResetSession();
-                    sfx.playClick();
-                  }}
-                  className={`mobile-pill px-1.5 md:px-2.5 py-0.5 text-[8px] md:text-[9px] sm:md:text-[10px] font-mono font-black uppercase tracking-wider rounded-full border transition-all cursor-pointer whitespace-nowrap shrink-0 overflow-x-auto ${botRaceActive
-                      ? 'bg-[#00F0FF]/15 border-[#00F0FF]/40 text-[#00F0FF] shadow-[0_0_8px_rgba(0,240,255,0.15)]'
-                      : 'bg-[#1F2833]/10 border-zinc-850 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                >
-                  🤖 Bot Race
-                </button>
-
-                {/* ADAPTIVE BOSS BATTLE */}
-                <button
-                  onClick={() => {
-                    setAdaptiveBossActive(true);
-                    setBotRaceActive(false);
-                    setFreestyleMode(false);
-                    setZenMode(false);
-                    setArcadeActive(false);
-                    handleResetSession();
-                    sfx.playClick();
-                  }}
-                  className={`mobile-pill px-1.5 md:px-2.5 py-0.5 text-[8px] md:text-[9px] sm:md:text-[10px] font-mono font-black uppercase tracking-wider rounded-full border transition-all cursor-pointer whitespace-nowrap shrink-0 overflow-x-auto ${adaptiveBossActive
-                      ? 'bg-[#00F0FF]/15 border-[#00F0FF]/40 text-[#00F0FF] shadow-[0_0_8px_rgba(0,240,255,0.15)]'
-                      : 'bg-[#1F2833]/10 border-zinc-850 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                >
-                  💀 Boss
-                </button>
-
-                {/* RANDOM STORY */}
-                <button
-                  onClick={() => {
-                    setFreestyleMode(false);
-                    handleModeChange("normal");
-                    setSelectedStoryId(null);
-                    const randomStory = getRandomStoryLesson();
-                    setCurrentLesson(randomStory);
-                    handleResetSession();
-                    sfx.playClick();
-                  }}
-                  className={`mobile-pill px-1.5 md:px-2.5 py-0.5 text-[8px] md:text-[9px] sm:md:text-[10px] font-mono font-black uppercase tracking-wider rounded-full border transition-all cursor-pointer whitespace-nowrap shrink-0 overflow-x-auto ${activeAppMode === 'normal' && !freestyleMode && currentLesson.category && currentLesson.category.startsWith('Practice Stories') && selectedStoryId === null
-                      ? 'bg-[#00F0FF]/15 border-[#00F0FF]/40 text-[#00F0FF] shadow-[0_0_8px_rgba(0,240,255,0.15)]'
-                      : 'bg-[#1F2833]/10 border-zinc-850 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                >
-                  🎲 Random Story
-                </button>
-
-                {/* PRACTICE STORIES */}
-                <button
-                  onClick={() => {
-                    setFreestyleMode(false);
-                    const filtered = getFilteredStories(testDuration);
-                    const firstStory = filtered[0] || LESSONS.find(l => l.category === (currentScript === 'hindi' ? "Practice Stories (Hindi)" : "Practice Stories"));
-                    if (firstStory) {
-                      loadLesson(firstStory);
-                      setSelectedStoryId(firstStory.id);
-                    }
-                    sfx.playClick();
-                  }}
-                  className={`mobile-pill px-1.5 md:px-2.5 py-0.5 text-[8px] md:text-[9px] sm:md:text-[10px] font-mono font-black uppercase tracking-wider rounded-full border transition-all cursor-pointer whitespace-nowrap shrink-0 overflow-x-auto ${currentLesson.category && currentLesson.category.startsWith("Practice Stories") && !freestyleMode && selectedStoryId !== null
-                      ? 'bg-[#45A29E]/20 border-[#45A29E]/40 text-[#45A29E] shadow-[0_0_8px_rgba(69,162,158,0.2)]'
-                      : 'bg-[#1F2833]/10 border-zinc-850 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                >
-                  📚 Practice Stories
-                </button>
-
-                {/* FREESTYLE */}
-                <button
-                  onClick={() => {
-                    setFreestyleMode(!freestyleMode);
-                    handleResetSession();
-                    sfx.playClick();
-                  }}
-                  className={`mobile-pill px-1.5 md:px-2.5 py-0.5 text-[8px] md:text-[9px] sm:md:text-[10px] font-mono font-black uppercase tracking-wider rounded-full border transition-all cursor-pointer whitespace-nowrap shrink-0 overflow-x-auto ${freestyleMode
-                      ? 'bg-[#FF6B35]/20 border-[#FF6B35]/40 text-[#FF6B35] shadow-[0_0_8px_rgba(255,107,53,0.3)]'
-                      : 'bg-[#1F2833]/10 border-zinc-850 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                >
-                  📝 Freestyle
-                </button>
-
-                {/* EXAM MODE TOGGLE */}
-                <button
-                  onClick={() => {
-                    const next = !examMode;
-                    setExamMode(next);
-                    localStorage.setItem('ribbon_exam_mode', next.toString());
-                    handleResetSession();
-                    sfx.playClick();
-                  }}
-                  className={`mobile-pill px-1.5 md:px-2.5 py-0.5 text-[8px] md:text-[9px] sm:md:text-[10px] font-mono font-black uppercase tracking-wider rounded-full border transition-all cursor-pointer whitespace-nowrap shrink-0 overflow-x-auto ${examMode
-                      ? 'bg-red-500/20 border-red-500/50 text-red-400 shadow-[0_0_8px_rgba(239,68,68,0.3)]'
-                      : 'bg-[#1F2833]/10 border-zinc-850 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  title={examMode ? 'Exam Mode ON — Backspace disabled (SSC/CHSL strict)' : 'Enable Exam Mode — disables backspace'}
-                >
-                  🏛️ Exam
-                </button>
-
-                {/* Profiles select as a beautiful rounded select pill - centers & places in new line on mobile/tablet */}
-                <div className="flex items-center justify-center w-full md:w-auto mt-1 md:mt-0 shrink-0">
-                  <select
-                    value={activeAppMode}
-                    onChange={(e) => {
-                      const mode = e.target.value;
-                      if (mode === "code" || mode === "medical") {
-                        setFreestyleMode(false);
-                        handleModeChange(mode as any);
-                      } else {
-                        handleModeChange("normal");
-                      }
-                      sfx.playClick();
-                    }}
-                    className="bg-[#0B0C10]/60 text-zinc-400 hover:text-[#00F0FF] px-2 py-0.5 rounded-full border border-zinc-850 focus:border-[#00F0FF] focus:outline-none transition-all cursor-pointer text-[8px] md:text-[9px] sm:md:text-[10px] font-mono font-black uppercase tracking-wider shrink-0"
-                  >
-                    <option value="normal">Profiles</option>
-                    <option value="code">💻 JS Code</option>
-                    <option value="medical">🏥 Medical</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom Row: Integrated Stats Row below the selectors */}
-            <div className="flex items-center gap-1.5 flex-wrap w-full justify-center md:justify-start border-t border-zinc-850/40 pt-1.5 select-none" style={{ padding: '4px 0' }}>
-              <span className="text-[9px] sm:text-[10px] text-zinc-500 font-bold uppercase tracking-wider shrink-0">METRICS:</span>
-
-              {/* Pill 1: BENCHMARK */}
-              <div className="bg-[#0B0C10]/60 border border-[#FF6B35]/30 px-2.5 py-0.5 rounded-full flex items-center shadow-[0_0_6px_rgba(255,107,53,0.08)] shrink-0">
-                <span className="text-[#FF6B35] font-black tracking-wider text-[8px] sm:text-[9px] uppercase whitespace-nowrap">
-                  BENCHMARK: {speedTarget} WPM
-                </span>
-              </div>
-
-              {/* Pill 2: LIVE SPEED WITH RADIAL RING */}
-              <div className="bg-[#0B0C10]/60 border border-[#00F0FF]/30 px-2.5 py-0.5 rounded-full flex items-center shadow-[0_0_6px_rgba(0,240,255,0.08)] shrink-0 gap-1.5">
-                <div className="relative w-3.5 h-3.5 flex items-center justify-center shrink-0">
-                  <svg className="w-3.5 h-3.5 transform -rotate-90">
-                    <circle cx="7" cy="7" r="5" stroke="rgba(255,255,255,0.1)" strokeWidth="1.5" fill="transparent" />
-                    <circle cx="7" cy="7" r="5" stroke="#00F0FF" strokeWidth="1.5" fill="transparent"
-                      strokeDasharray={2 * Math.PI * 5}
-                      strokeDashoffset={2 * Math.PI * 5 * (1 - Math.min(1, liveWpm / (speedTarget || 60)))}
-                      className="transition-all duration-300 ease-out"
-                    />
-                  </svg>
-                </div>
-                <span className="text-[#00F0FF] font-black tracking-wider text-[8px] sm:text-[9px] uppercase whitespace-nowrap">
-                  LIVE: {liveWpm} WPM
-                </span>
-              </div>
-
-              {/* Pill 3: ACCURACY */}
-              <div className="bg-[#0B0C10]/60 border border-[#45A29E]/30 px-2.5 py-0.5 rounded-full flex items-center shadow-[0_0_6px_rgba(69,162,158,0.08)] shrink-0">
-                <span className="text-[#45A29E] font-black tracking-wider text-[8px] sm:text-[9px] uppercase whitespace-nowrap">
-                  ACC: {freestyleMode ? "--" : (typedText.length > 0
-                    ? `${liveAccuracy}%`
-                    : "100%")}
-                </span>
-              </div>
-
-              {/* Pill 4: GHOST PB */}
-              {ghostTimestamps.length > 0 ? (
-                <div className="bg-[#0B0C10]/60 border border-[#45A29E]/30 px-2.5 py-0.5 rounded-full flex items-center shadow-[0_0_6px_rgba(69,162,158,0.08)] animate-pulse shrink-0">
-                  <span className="text-[#45A29E] font-black tracking-wider text-[8px] sm:text-[9px] uppercase flex items-center gap-1 whitespace-nowrap">
-                    👻 GHOST: {ghostPbWpm} PB
-                  </span>
-                </div>
-              ) : (
-                <div className="bg-[#0B0C10]/40 border border-zinc-800/40 px-2.5 py-0.5 rounded-full flex items-center shrink-0">
-                  <span className="text-zinc-600 font-black tracking-wider text-[8px] sm:text-[9px] uppercase flex items-center gap-1 whitespace-nowrap">
-                    👻 PB: NONE
-                  </span>
-                </div>
-              )}
-
-              {/* Pill 5: HISTORICAL AVG */}
-              <div className="bg-[#0B0C10]/60 border border-zinc-800/40 px-2.5 py-0.5 rounded-full flex items-center shrink-0">
-                <span className="text-zinc-400 font-black tracking-wider text-[8px] sm:text-[9px] uppercase whitespace-nowrap">
-                  HISTORICAL AVG: {globalStats.avgWpm || 0} WPM
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* MOBILE SWIPE DOWN SHEET FOR LIVE STATS */}
-        {mobileStatsOpen && (
-          <div className="md:hidden absolute top-14 left-0 right-0 bg-[#0E0E11] border-b border-zinc-800/90 p-4 space-y-4 animate-in slide-in-from-top duration-300 z-30 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono text-[#FFB800] font-black uppercase tracking-wider">Live Metrics Telemetry</span>
-              <button
-                onClick={() => setMobileStatsOpen(false)}
-                className="p-1 hover:bg-zinc-850 rounded-lg text-zinc-500 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2.5">
-              <div className="bg-[#141419] p-3 rounded-[12px] border border-zinc-850/80">
-                <span className="text-[9px] font-mono text-zinc-500 block">SPEED</span>
-                <span className="text-sm font-mono font-black text-[#FFB800] block mt-0.5">
-                  {liveWpm} WPM
-                </span>
-              </div>
-              <div className="bg-[#141419] p-3 rounded-[12px] border border-zinc-850/80">
-                <span className="text-[9px] font-mono text-zinc-500 block">ACCURACY</span>
-                <span className="text-sm font-mono font-black text-white block mt-0.5">
-                  {typedText.length > 0
-                    ? liveAccuracy
-                    : 100}%
-                </span>
-              </div>
-              <div className="bg-[#141419] p-3 rounded-[12px] border border-zinc-850/80">
-                <span className="text-[9px] font-mono text-zinc-500 block">TIME ELAPSED</span>
-                <span className="text-sm font-mono font-black text-white block mt-0.5">
-                  {elapsed.toFixed(1)}s
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-zinc-950 p-2.5 rounded-[12px] border border-zinc-900 text-[11px] text-zinc-400 font-mono flex items-center justify-between">
-              <span className="text-zinc-500">Benchmark Challenge Speed:</span>
-              <span className="text-[#FFB800] font-bold">{speedTarget} WPM</span>
-            </div>
-          </div>
-        )}
-
-        {/* CORE WORKSPACE CONTENT PANEL */}
-        <div className="xl:hidden flex-1 flex flex-col justify-between items-center px-2 sm:px-4 md:px-8 relative py-3 overflow-y-auto scrollbar-none w-full">
-
-          {/* A. RIBBON STATS BAR (Placed just above the dominant text area) */}
-          {!arcadeActive && (
-            <>
-              <div className="flex w-full max-w-4xl flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 border border-zinc-800 bg-[#1F2833]/30 rounded-[12px] mb-2.5 sm:mb-3.5 text-xs font-mono select-none shadow-md backdrop-blur-sm">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="w-2 h-2 rounded-full bg-[#45A29E] animate-pulse" />
-                  <span className="text-[#45A29E] font-black uppercase tracking-wider text-[10px] font-sans">
-                    {freestyleMode ? "📝 FREESTYLE CANVAS" : currentLesson.name}
-                  </span>
-                  <span className="text-zinc-500 hidden sm:inline">|</span>
-                  <span className="text-zinc-400 hidden sm:inline text-[9px]">
-                    {freestyleMode ? "No prompt restrictions, type freely" : currentLesson.desc}
-                  </span>
-                </div>
-
-                {/* Bug Fix 2 - Stats Row flat horizontal row of pills */}
-                <div
-                  onWheel={handleHorizontalWheel}
-                  className="flex flex-row flex-wrap items-center gap-1.5 overflow-x-auto scrollbar-none scroll-smooth overscroll-x-contain touch-pan-x py-0.5 max-w-full"
-                >
-                  {/* Pill 1: BENCHMARK: 60 WPM (Orange) */}
-                  <div className="bg-[#0B0C10]/80 border border-[#FF6B35]/30 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full flex items-center shadow-[0_0_8px_rgba(255,107,53,0.1)] shrink-0">
-                    <span className="text-[#FF6B35] font-black tracking-wider text-[8px] sm:text-[9px] uppercase whitespace-nowrap">
-                      BENCHMARK: {speedTarget} WPM
-                    </span>
-                  </div>
-
-                  {/* Pill 2: LIVE: X WPM (Cyan) */}
-                  <div className="bg-[#0B0C10]/80 border border-[#00F0FF]/30 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full flex items-center shadow-[0_0_8px_rgba(0,240,255,0.1)] shrink-0">
-                    <span className="text-[#00F0FF] font-black tracking-wider text-[8px] sm:text-[9px] uppercase whitespace-nowrap">
-                      LIVE: {liveWpm} WPM
-                    </span>
-                  </div>
-
-                  {/* Pill 3: ACC: Y% (Mint) */}
-                  <div className="bg-[#0B0C10]/80 border border-[#45A29E]/30 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full flex items-center shadow-[0_0_8px_rgba(69,162,158,0.1)] shrink-0">
-                    <span className="text-[#45A29E] font-black tracking-wider text-[8px] sm:text-[9px] uppercase whitespace-nowrap">
-                      ACC: {freestyleMode ? "--" : (typedText.length > 0
-                        ? `${liveAccuracy}%`
-                        : "100%")}
-                    </span>
-                  </div>
-
-                  {/* Pill 4: GHOST: Z WPM PB (Gray) */}
-                  {ghostTimestamps.length > 0 ? (
-                    <div className="bg-[#0B0C10]/80 border border-zinc-700 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full flex items-center shadow-[0_0_8px_rgba(255,255,255,0.05)] animate-pulse shrink-0">
-                      <span className="text-zinc-400 font-black tracking-wider text-[8px] sm:text-[9px] uppercase flex items-center gap-1 whitespace-nowrap">
-                        👻 GHOST: {ghostPbWpm} PB
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="bg-[#0B0C10]/40 border border-zinc-800/50 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full flex items-center shrink-0">
-                      <span className="text-zinc-600 font-black tracking-wider text-[8px] sm:text-[9px] uppercase flex items-center gap-1 whitespace-nowrap">
-                        👻 PB: NONE
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Pill 5: HISTORICAL AVG: X WPM (Muted Gray) */}
-                  <div className="bg-[#0B0C10]/60 border border-zinc-800/50 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full flex items-center shadow-sm shrink-0">
-                    <span className="text-zinc-400 font-black tracking-wider text-[8px] sm:text-[9px] uppercase whitespace-nowrap">
-                      HISTORICAL AVG: {globalStats.avgWpm || 0} WPM
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* WEAKNESS COACHING MODULE */}
-          {!arcadeActive && !workoutCompleted && weaknessOpen && (
-            <div className="flex w-full max-w-4xl flex-col gap-2.5 mb-4 select-none">
-
-              {weaknessOpen && (
-                <div className="w-full animate-in fade-in slide-in-from-top-2 duration-250">
-                  {weaknessBigram ? (
-                    <div className="bg-[#FF6B35]/5 border border-[#FF6B35]/20 rounded-[12px] p-3.5 backdrop-blur-sm shadow-md flex flex-col justify-between gap-3">
-                      <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-mono uppercase tracking-widest font-black text-[#FF6B35] flex items-center gap-1">
-                            🎯 Weakness Coaching
-                          </span>
-                        </div>
-                        <div className="bg-[#FF6B35]/20 border border-[#FF6B35]/40 px-2.5 py-0.5 rounded-full font-mono text-[9px] text-[#FF6B35] font-black uppercase shadow-[0_0_8px_rgba(255,107,53,0.1)]">
-                          Slowest: '{weaknessBigram}' ({weaknessDelay}ms)
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
-                        <div className="text-[10px] text-zinc-400 font-mono italic max-w-full sm:max-w-[65%] truncate" title={weaknessSentence || ""}>
-                          {sentenceGenerating ? (
-                            <span className="text-zinc-500 animate-pulse">Generating custom drill...</span>
-                          ) : (
-                            weaknessSentence || "Reviewing keystroke delays..."
-                          )}
-                        </div>
-                        <button
-                          onClick={practiceWeakness}
-                          disabled={sentenceGenerating || !weaknessSentence}
-                          className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-black uppercase tracking-wider transition-all border cursor-pointer flex items-center gap-1.5 shadow-md ${sentenceGenerating || !weaknessSentence
-                              ? 'bg-[#FF6B35]/5 border-zinc-850 text-zinc-600 cursor-not-allowed'
-                              : 'bg-[#FF6B35]/20 border-[#FF6B35] text-[#FF6B35] hover:bg-[#FF6B35]/35 active:scale-95 shadow-[0_0_10px_rgba(255,107,53,0.2)]'
-                            }`}
-                        >
-                          <span>Practice Weakness 🎯</span>
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-[#1F2833]/15 border border-zinc-900 rounded-[12px] p-3.5 backdrop-blur-sm shadow-md flex flex-col justify-center items-center text-center">
-                      <div className="flex items-center gap-1.5 text-zinc-500 text-[10px] font-mono uppercase tracking-widest font-black">
-                        <Activity className="w-3.5 h-3.5 text-[#FF6B35]" />
-                        <span>Keystroke Analyzer</span>
-                      </div>
-                      <span className="text-[10px] text-zinc-500 font-mono mt-1.5">
-                        Complete a standard lesson to analyze fumbles and bi-gram delays.
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* PROGRESS BAR DIRECTLY ABOVE THE TEXT BLOCK */}
-          {!arcadeActive && !workoutCompleted && (
-            <div className="w-full max-w-4xl mb-2.5 sm:mb-4 select-none space-y-2">
-              <div>
-                <div className="flex justify-between items-center text-[10px] font-mono text-zinc-400 mb-1.5">
-                  <span className="tracking-wider font-extrabold text-zinc-500 uppercase text-[9px]">Lesson Progress</span>
-                  <span className="text-[#00F0FF] font-black">
-                    {targetText.length > 0 ? Math.min(100, Math.round((typedText.length / targetText.length) * 100)) : 0}%
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-[#1F2833]/40 rounded-full overflow-hidden border border-zinc-850">
-                  <div
-                    className="h-full bg-gradient-to-r from-[#00F0FF] to-[#45A29E] shadow-[0_0_12px_#00F0FF] transition-all duration-200 rounded-full"
-                    style={{ width: `${targetText.length > 0 ? Math.min(100, Math.round((typedText.length / targetText.length) * 100)) : 0}%` }}
-                  />
-                </div>
-              </div>
-
-              {(botRaceActive || adaptiveBossActive) && (
-                <div className="animate-in fade-in slide-in-from-top-1 duration-200">
-                  <div className="flex justify-between items-center text-[10px] font-mono text-zinc-400 mb-1.5">
-                    <span className="tracking-wider font-extrabold text-[#FF6B35] uppercase text-[9px] flex items-center gap-1">
-                      {botRaceActive ? "🤖 BOT OPPONENT" : "💀 BOSS OPPONENT"} Progress
-                    </span>
-                    <span className="text-[#FF6B35] font-black">
-                      {targetText.length > 0
-                        ? Math.min(100, Math.round(((botRaceActive ? botProgress : bossProgress) / targetText.length) * 100))
-                        : 0}%
-                    </span>
-                  </div>
-                  <div className="w-full h-2 bg-[#1F2833]/40 rounded-full overflow-hidden border border-zinc-850">
-                    <div
-                      className="h-full bg-gradient-to-r from-[#FF6B35] to-[#FF3300] shadow-[0_0_12px_#FF6B35] transition-all duration-200 rounded-full"
-                      style={{
-                        width: `${targetText.length > 0
-                          ? Math.min(100, Math.round(((botRaceActive ? botProgress : bossProgress) / targetText.length) * 100))
-                          : 0}%`
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* B. THE STAR ELEMENT: THE TYPING TEXT AREA (With explicit min-height constraints to prevent overflow) */}
-          <div className={`
-            ${isPanelCollapsed
-              ? 'flex-1 min-h-[200px] sm:min-h-[260px] max-h-[60dvh] overflow-hidden'
-              : 'h-[25vh] min-h-[140px] sm:min-h-[180px] max-h-[35vh] overflow-hidden'
-            } 
-            w-full max-w-4xl flex flex-col justify-start items-center relative bg-zinc-950/20 border border-zinc-900/40 rounded-[20px] p-3 sm:p-6 mb-2
-          `}>
-
-            {/* Pause Screen Overlay */}
-            {isPaused && !workoutCompleted && !arcadeActive && (
-              <div className="absolute inset-0 bg-[#0F0F12]/95 backdrop-blur-md flex flex-col items-center justify-center space-y-4 z-30 animate-in fade-in duration-200">
-                <div className="w-12 h-12 bg-[#FFB800]/10 rounded-full flex items-center justify-center border border-[#FFB800]/20 shadow-[0_0_20px_rgba(255,184,0,0.15)]">
-                  <Pause className="w-5 h-5 text-[#FFB800] animate-pulse" />
-                </div>
-                <div className="text-center px-4">
-                  <h4 className="text-sm font-mono text-zinc-300 uppercase tracking-widest font-black">Practice Session Paused</h4>
-                  <p className="text-[11px] text-zinc-500 font-mono mt-1 max-w-xs mx-auto">Tutor timer and physical key inputs are currently frozen.</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setIsPaused(false);
-                    sfx.playClick();
-                  }}
-                  className="bg-[#FFB800] hover:bg-[#FFB800]/95 text-zinc-950 font-extrabold font-mono text-[10px] px-5 py-2.5 rounded-[10px] transition-transform active:scale-95 shadow-lg shadow-[#FFB800]/15 uppercase tracking-wider cursor-pointer"
-                >
-                  Resume Training
-                </button>
-              </div>
-            )}
-
-            {/* Timed Session Completed Overlay */}
-            {timedEndModalOpen && (
-              <div className="absolute inset-0 bg-[#0F0F12]/95 backdrop-blur-md flex flex-col items-center justify-center space-y-6 z-40 animate-in fade-in zoom-in-95 duration-200">
-                <div className="w-16 h-16 bg-[#00F0FF]/10 rounded-full flex items-center justify-center border border-[#00F0FF]/30 shadow-[0_0_25px_rgba(0,240,255,0.2)]">
-                  <Timer className="w-8 h-8 text-[#00F0FF] animate-pulse" />
-                </div>
-
-                <div className="text-center">
-                  <h3 className="text-lg md:text-xl font-mono text-zinc-200 uppercase tracking-widest font-black">Time's Up!</h3>
-                  <p className="text-xs text-zinc-500 font-mono mt-1">Your session completed successfully.</p>
-                </div>
-
-                <div className="flex gap-4">
-                  {/* WPM Card */}
-                  <div className="bg-[#141A26]/80 border border-[#00F0FF]/30 px-6 py-4 rounded-xl text-center min-w-[120px] shadow-[0_0_15px_rgba(0,240,255,0.1)]">
-                    <span className="text-[10px] font-mono text-zinc-500 block uppercase font-bold">Final WPM</span>
-                    <span className="text-2xl font-mono font-black text-[#00F0FF]">
-                      {testDuration ? Math.round((typedText.length / 5) / (testDuration / 60)) : 0}
-                    </span>
-                  </div>
-
-                  {/* Accuracy Card */}
-                  <div className="bg-[#141A26]/80 border border-[#45A29E]/30 px-6 py-4 rounded-xl text-center min-w-[120px] shadow-[0_0_15px_rgba(69,162,158,0.1)]">
-                    <span className="text-[10px] font-mono text-zinc-500 block uppercase font-bold">Accuracy</span>
-                    <span className="text-2xl font-mono font-black text-[#45A29E]">
-                      {freestyleMode ? "N/A" : (() => {
-                        let correctsCount = 0;
-                        for (let i = 0; i < typedText.length; i++) {
-                          if (typedText[i] === targetText[i]) correctsCount++;
-                        }
-                        return typedText.length > 0 ? `${Math.round((correctsCount / typedText.length) * 100)}%` : "100%";
-                      })()}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    handleResetSession();
-                    sfx.playClick();
-                  }}
-                  className="bg-[#00F0FF] hover:bg-[#00F0FF]/90 text-zinc-950 font-black font-mono text-xs px-8 py-3 rounded-full transition-all hover:scale-105 active:scale-95 shadow-lg shadow-[#00F0FF]/20 uppercase tracking-widest cursor-pointer"
-                >
-                  Retry Test
-                </button>
-              </div>
-            )}
-
-            {/* Race Outcome Completed Overlay */}
-            {raceEndModalOpen && (
-              <div className="absolute inset-0 bg-[#0F0F12]/95 backdrop-blur-md flex flex-col items-center justify-center space-y-6 z-40 animate-in fade-in zoom-in-95 duration-200">
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center border shadow-lg ${raceWinner === 'user'
-                    ? 'bg-[#45A29E]/10 border-[#45A29E]/30 text-[#45A29E] shadow-[#45A29E]/20'
-                    : 'bg-[#FF6B35]/10 border-[#FF6B35]/30 text-[#FF6B35] shadow-[#FF6B35]/20'
-                  }`}>
-                  {raceWinner === 'user' ? (
-                    <Trophy className="w-8 h-8 animate-bounce" />
-                  ) : (
-                    <X className="w-8 h-8 animate-pulse" />
-                  )}
-                </div>
-
-                <div className="text-center">
-                  <h3 className={`text-xl font-mono uppercase tracking-widest font-black ${raceWinner === 'user' ? 'text-[#45A29E]' : 'text-[#FF6B35]'
-                    }`}>
-                    {raceWinner === 'user' ? '🏆 VICTORY!' : '💀 DEFEAT!'}
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-1 font-mono">
-                    {raceWinner === 'user'
-                      ? 'You dominated the race with superior keystroke speed!'
-                      : `The ${raceWinner === 'bot' ? '🤖 AI Bot' : '💀 Adaptive Boss'} overtook your position.`}
-                  </p>
-                </div>
-
-                {/* Compare Metrics */}
-                <div className="grid grid-cols-2 gap-4 w-full max-w-sm px-6">
-                  {/* User stats */}
-                  <div className="bg-[#141A26]/80 border border-zinc-800 p-4 rounded-xl text-center">
-                    <span className="text-[9px] font-mono text-zinc-500 block uppercase font-bold">YOU (PLAYER)</span>
-                    <span className="text-xl font-mono font-black text-white mt-1 block">
-                      {raceMetrics?.userWpm || 0} <span className="text-[10px] font-normal text-zinc-500">WPM</span>
-                    </span>
-                    <span className="text-[10px] font-mono text-zinc-400 block mt-0.5">
-                      {raceMetrics?.userAcc || 0}% ACC
-                    </span>
-                  </div>
-
-                  {/* Opponent stats */}
-                  <div className="bg-[#141A26]/80 border border-zinc-800 p-4 rounded-xl text-center">
-                    <span className="text-[9px] font-mono text-zinc-500 block uppercase font-bold">
-                      {raceWinner === 'bot' || botRaceActive ? '🤖 AI BOT' : '💀 ADAPTIVE BOSS'}
-                    </span>
-                    <span className="text-xl font-mono font-black text-[#00F0FF] mt-1 block">
-                      {raceMetrics?.opponentWpm || 0} <span className="text-[10px] font-normal text-zinc-500">WPM</span>
-                    </span>
-                    <span className="text-[10px] font-mono text-zinc-400 block mt-0.5">
-                      100% ACC
-                    </span>
-                  </div>
-                </div>
-
-                {/* Extra Streak/Wins Info */}
-                {adaptiveBossActive && (
-                  <div className="text-center">
-                    <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                      🔥 BOSS WIN STREAK: <strong className="text-[#FF6B35] font-black">{bossWinStreak}</strong>
-                    </p>
-                  </div>
-                )}
-                {botRaceActive && (
-                  <div className="text-center flex gap-4 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                    <span>🏆 USER WINS: <strong className="text-[#45A29E] font-black">{userWins}</strong></span>
-                    <span>🤖 BOT WINS: <strong className="text-zinc-400 font-black">{botWins}</strong></span>
-                  </div>
-                )}
-
-                <div className="flex gap-3 w-full max-w-sm px-6">
-                  <button
-                    onClick={() => {
-                      setRaceEndModalOpen(false);
-                      handleResetSession();
-                      sfx.playClick();
-                    }}
-                    className="flex-1 bg-[#00F0FF] hover:bg-[#00F0FF]/90 text-zinc-950 font-black font-mono text-xs py-3 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-lg shadow-[#00F0FF]/20 uppercase tracking-widest cursor-pointer"
-                  >
-                    Rematch
-                  </button>
-                  <button
-                    onClick={() => {
-                      setRaceEndModalOpen(false);
-                      setBotRaceActive(false);
-                      setAdaptiveBossActive(false);
-                      handleResetSession();
-                      sfx.playClick();
-                    }}
-                    className="flex-1 bg-zinc-900 hover:bg-zinc-850 text-white font-semibold font-mono text-xs py-3 rounded-xl border border-zinc-800 transition-all cursor-pointer uppercase tracking-widest"
-                  >
-                    Exit Mode
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {arcadeActive ? (
-              /* ARCADE HUB — 4 mini-games */
-              <ArcadeHub
-                sfx={sfx}
-                onClose={() => { setArcadeActive(false); sfx.playClick(); }}
-              />
-            ) : workoutCompleted ? (
-              /* WORKOUT COMPLETED STATS OVERLAY CARD */
-              <div className="flex flex-col items-center justify-center text-center space-y-4 max-w-md w-full py-6 select-none animate-in fade-in zoom-in-95 duration-300">
-                <div className="w-14 h-14 bg-[#FFB800]/10 rounded-full flex items-center justify-center text-[#FFB800] border border-[#FFB800]/20 shadow-[0_0_20px_rgba(255,184,0,0.15)]">
-                  <Award className="w-7 h-7 animate-bounce" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white tracking-tight">Lesson Success!</h3>
-                  <p className="text-xs text-zinc-500 mt-1 font-mono">Telemetry metrics synced to your analytics database</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 w-full my-2">
-                  <div className="bg-[#141419] p-4 rounded-[12px] border border-zinc-850 text-center shadow-inner">
-                    <span className="text-[10px] font-mono text-zinc-500 block uppercase">TYPING SPEED</span>
-                    <span className="text-2xl font-mono font-black text-[#FFB800] block mt-1">
-                      {workoutStats?.wpm} <span className="text-xs font-normal text-zinc-500">WPM</span>
-                    </span>
-                  </div>
-                  <div className="bg-[#141419] p-4 rounded-[12px] border border-zinc-850 text-center shadow-inner">
-                    <span className="text-[10px] font-mono text-zinc-500 block uppercase">ACCURACY</span>
-                    <span className="text-2xl font-mono font-black text-white block mt-1">
-                      {workoutStats?.accuracy}%
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 w-full pt-1">
-                  <button
-                    onClick={handleResetSession}
-                    className="flex-1 bg-zinc-900 hover:bg-zinc-850 text-white font-semibold text-xs py-3 rounded-[12px] border border-zinc-800 transition-all cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    Retry Drills
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Load next lesson or reset
-                      const nextId = currentLesson.id + 1;
-                      const nextL = LESSONS.find(l => l.id === nextId) || LESSONS[0];
-                      loadLesson(nextL);
-                    }}
-                    className="flex-1 bg-[#FFB800] hover:bg-[#FFB800]/90 text-zinc-950 font-extrabold text-xs py-3 rounded-[12px] transition-all cursor-pointer shadow-lg shadow-[#FFB800]/20"
-                  >
-                    Next Stage
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="w-full flex-1 flex flex-col items-center justify-start overflow-hidden -mt-3 md:-mt-6">
-                {/* Ribbon focus helper */}
-                <div
-                  className="w-full text-center select-none shrink-0"
-                  style={{
-                    marginBottom: '8px',
-                    padding: '4px 0',
-                    opacity: (typedText.length === 0 && !freestyleMode) ? 1 : 0,
-                    transition: 'opacity 0.3s',
-                    color: '#45A29E',
-                    fontSize: '13px',
-                    letterSpacing: '0.5px'
-                  }}
-                >
-                  <span className="font-mono uppercase font-black flex items-center justify-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#45A29E] shadow-[0_0_8px_#45A29E]" />
-                    Ribbon Auto-Focused · Press any key to begin training
-                  </span>
-                </div>
-
-                {/* TYPING FOCUS AREA — uses mobileContainerRef so getActiveContainer()
-                     correctly returns this element on mobile (containerRef = desktop panel).
-                     min-h-0 is critical: without it flex min-height:auto makes the element
-                     expand to fit all content, so clientHeight===scrollHeight and scrollTop
-                     is always a no-op. min-h-0 lets flex constrain it to allocated space. */}
-                <div
-                  ref={mobileContainerRef}
-                  className="typing-area w-full flex-1 min-h-0 xl:flex-none xl:h-[62vh] xl:max-h-[62vh] overflow-y-auto scrollbar-none relative flex flex-col justify-start items-start select-none"
-                >
-                  {freestyleMode ? (
-                    <div
-                      className="w-full text-left font-mono text-[15px] sm:text-[16px] md:text-[17px] lg:text-[18px] leading-[1.65] tracking-wide text-[#45A29E] flex flex-wrap gap-y-1"
-                      style={{ paddingBottom: '20px' }}
-                    >
-                      <span className="break-all whitespace-pre-wrap">{typedText}</span>
-                      <span
-                        ref={activeCharRef}
-                        className="text-[#00F0FF] font-black scale-110 relative z-10 transition-transform animate-pulse border-b-2 border-[#00F0FF] inline-block min-w-[12px] h-[28px] text-center"
-                        style={{ textShadow: "0 0 10px #00F0FF, 0 0 20px #00F0FF" }}
-                      >
-                        &nbsp;
-                      </span>
-                      {typedText.length === 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <span className="text-[10px] font-mono text-[#00F0FF] uppercase tracking-widest font-black animate-pulse flex items-center justify-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-[#00F0FF] shadow-[0_0_8px_#00F0FF]" />
-                            Freestyle Mode Active · Type anything you wish
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div
-                      className="w-full text-left font-mono text-[15px] sm:text-[16px] md:text-[17px] lg:text-[18px] leading-[1.65] tracking-wide text-zinc-400"
-                      style={{ paddingBottom: '20px' }}
-                    >
-                      <TypingText
-                        typedText={typedText}
-                        targetText={targetText}
-                        activeAppMode={activeAppMode}
-                        punishedTokenIndex={punishedTokenIndex}
-                        parsedParagraphs={parsedParagraphs}
-                        activeCharRef={activeCharRef}
-                        mistypedNewlineIndices={mistypedNewlineIndices}
-                        autoInsertedBrackets={autoInsertedBrackets}
-                        ghostIndex={ghostIndex}
-                        zenMode={zenMode}
-                        opponentIndex={botRaceActive ? Math.floor(botProgress) : (adaptiveBossActive ? Math.floor(bossProgress) : -1)}
-                        opponentType={botRaceActive ? 'bot' : (adaptiveBossActive ? 'boss' : null)}
-                      />
-                    </div>
-                  )}
-
-                  {/* Absolutely positioned cursor caret inside the container */}
-                  <div
-                    className="custom-caret absolute bg-[#00F0FF]/25 border-b-2 border-[#00F0FF] pointer-events-none select-none animate-pulse hidden"
-                    style={{
-                      boxShadow: "0 0 10px rgba(0, 240, 255, 0.5)",
-                      zIndex: 10,
-                    }}
-                  />
-
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* BOTTOM SECTION COMPACT WRAPPER (SQUASHES GAPS TO 2px) */}
-          <div className="w-full flex flex-col items-center justify-center" style={{ gap: '2px', paddingBottom: '8px' }}>
-            {/* D. VIRTUAL KEYBOARD SECTION */}
-            <div className="w-full max-w-2xl shrink-0 mt-2">
-              {/* Keyboard layout cycle indicator */}
-              <div className="w-full flex items-center justify-between select-none font-mono" style={{ marginBottom: '4px', fontSize: '11px' }}>
-                <button
-                  onClick={() => {
-                    const nextLayout = keyboardLayout === 'qwerty' ? 'dvorak' : keyboardLayout === 'dvorak' ? 'colemak' : 'qwerty';
-                    setKeyboardLayout(nextLayout);
-                    sfx.playClick();
-                  }}
-                  className="px-2.5 py-1 rounded-lg border border-zinc-800 bg-[#0B0C10]/60 hover:bg-zinc-850 text-[11px] font-mono uppercase tracking-wider cursor-pointer flex items-center gap-1 group select-none transition-all hover:border-[#00F0FF]/30 hover:text-white"
-                  title="Click to cycle layout (QWERTY -> DVORAK -> COLEMAK)"
-                >
-                  <span className="text-zinc-500">LAYOUT:</span>
-                  <span className="text-[#00F0FF] font-black group-hover:animate-pulse">{keyboardLayout}</span>
-                  <span className="text-zinc-650 text-[8px] sm:inline hidden">(Click to cycle)</span>
-                </button>
-
-                <div className="flex items-center gap-2">
-                  {mostFumbledKey && (
-                    <button
-                      onClick={() => generateFumbleDrill(mostFumbledKey)}
-                      className="px-2.5 py-0.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/50 text-rose-300 font-mono text-[9px] font-black uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer shadow-[0_0_10px_rgba(244,63,94,0.3)] animate-pulse"
-                      title={`Click to launch a targeted repair drill for key '${mostFumbledKey.toUpperCase()}'`}
-                    >
-                      <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
-                      <span>Mistyped: '{mostFumbledKey.toUpperCase()}' (Click to Repair ⚡)</span>
-                    </button>
-                  )}
-
-                  <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider hidden sm:inline">
-                    🧠 INTERACTIVE HEAT MAP
-                  </span>
-                </div>
-              </div>
-
-              <div className="w-full" style={{ marginBottom: '0px', paddingBottom: '0px' }}>
-                <VirtualKeyboard
-                  currentScript={currentScript}
-                  nextExpectedChar={arcadeActive ? null : nextExpectedChar}
-                  layout={keyboardLayout}
-                  physicalKeyPresses={deferredPhysicalKeyPresses}
-                  physicalKeyErrors={deferredPhysicalKeyErrors}
-                  onKeyClick={(charKey) => generateFumbleDrill(charKey)}
-                />
-              </div>
-            </div>
-
-
-
-            {/* C. THE BOTTOM BUTTONS CONTAINER (Centered with justify-center and padding-bottom: 8px) */}
-            <div className="w-full shrink-0 flex items-center justify-center gap-2" style={{ marginTop: '0px', paddingTop: '0px', paddingBottom: '8px' }}>
-              {/* Quick action button within gap space */}
-              {!workoutCompleted && !arcadeActive && (
-                <>
-                  <button
-                    onClick={() => {
-                      setIsPaused(!isPaused);
-                      sfx.playClick();
-                    }}
-                    className={`px-4 py-1.5 border rounded-full text-[10px] font-mono font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer ${isPaused
-                        ? 'bg-[#00F0FF]/10 border-[#00F0FF] text-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.3)]'
-                        : 'bg-transparent border-[#00F0FF] text-[#00F0FF] hover:bg-[#00F0FF]/10 shadow-[0_0_5px_rgba(0,240,255,0.15)]'
-                      }`}
-                    title={isPaused ? "Resume training clock" : "Pause training clock"}
-                  >
-                    {isPaused ? <Play className="w-3 h-3 text-[#00F0FF]" /> : <Pause className="w-3 h-3 text-[#00F0FF]" />}
-                    <span>{isPaused ? 'RESUME PRACTICE' : 'PAUSE TUTOR'}</span>
-                  </button>
-
-                  <button
-                    onClick={handleResetSession}
-                    className="px-4 py-1.5 text-[#FF6B35] bg-transparent border border-[#FF6B35] hover:bg-[#FF6B35]/10 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
-                    title="Restart workout timer and text"
-                  >
-                    <RefreshCw className="w-3 h-3 text-[#FF6B35]" />
-                    <span>RESTART (ESC)</span>
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* FLOATING GHOST PAUSE BUTTON (BOTTOM-RIGHT CORNER) */}
-
-
-        </div>
-
-        {/* TWO-COLUMN WORKSPACE LAYOUT (Desktop & Laptop >= 1280px) */}
-        <div className="hidden xl:flex flex-1 flex-row w-full h-full overflow-hidden relative">
+        {/* SINGLE RESPONSIVE WORKSPACE LAYOUT (desktop layout reflows for tablet/mobile) */}
+        <div className="flex flex-1 flex-row w-full h-full overflow-hidden relative">
 
           {/* Main Workspace Column */}
-          <div className={`${sidebarCollapsed ? 'w-full' : 'w-[74%]'} h-full flex flex-col justify-between p-6 overflow-hidden transition-[width,padding,margin] duration-500 ease-in-out will-change-[width]`}>
+          <div className={`${sidebarCollapsed ? 'w-full' : 'w-full lg:w-[74%]'} h-full flex flex-col justify-between p-3 sm:p-4 xl:p-5 overflow-hidden transition-[width,padding,margin] duration-500 ease-in-out will-change-[width]`}>
             {/* TopBar Redesign — Sleek Linear Premium Glassmorphism Top Header */}
-            <div className="flex flex-wrap min-h-14 py-2.5 shrink-0 items-center justify-between px-5 z-10 select-none bg-[#0D0F1A]/85 border border-zinc-800/80 border-t-amber-500/30 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] mb-3.5 max-w-full overflow-hidden gap-3 backdrop-blur-xl transition-all">
+            <div className="flex flex-wrap min-h-11 py-1.5 shrink-0 items-center justify-between px-4 z-10 select-none bg-[#0D0F1A]/85 border border-zinc-800/80 border-t-amber-500/30 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] mb-2.5 max-w-full overflow-hidden gap-2 backdrop-blur-xl transition-all">
               <div className="flex flex-wrap items-center gap-3">
+                {/* Hamburger Menu Button (small screens) — opens the slide-out drawer */}
+                <button
+                  onClick={() => {
+                    setMobileDrawerOpen(true);
+                    sfx.playClick();
+                  }}
+                  className="lg:hidden w-8 h-8 shrink-0 rounded-xl border border-zinc-800 text-zinc-400 hover:text-amber-400 hover:border-amber-500/40 hover:bg-amber-500/10 transition-all cursor-pointer flex items-center justify-center active:scale-95 shadow-sm"
+                  title="Menu"
+                >
+                  <Menu className="w-4 h-4" />
+                </button>
+
                 {/* Logo & Version Badge */}
                 <div className="flex items-center gap-2">
                   <span className="font-sans text-xl sm:text-2xl font-black bg-gradient-to-r from-amber-100 via-amber-400 to-amber-500 text-transparent bg-clip-text tracking-tighter select-none flex items-center gap-1.5">
                     <span className="text-amber-400 text-lg">🎀</span> Ribbon
                   </span>
-                  <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 text-[9px] font-mono font-bold rounded-md uppercase tracking-wide hidden sm:inline-block">
+                  <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-md uppercase tracking-wide hidden sm:inline-block">
                     PRO
                   </span>
                 </div>
 
                 <div className="h-4 w-px bg-zinc-800 hidden sm:block" />
 
-                {/* 3-COLOR SYSTEM STATS BAR */}
-                <div className="flex items-center gap-2.5 text-xs font-mono select-none">
+                {/* 3-COLOR SYSTEM STATS BAR (hidden on small screens; LIVE/ACC shown in story row below) */}
+                <div className="hidden lg:flex items-center gap-2.5 text-xs font-mono select-none">
                   {/* Accuracy: Green Success Color */}
                   <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-xl text-emerald-400 font-bold shadow-[0_0_10px_rgba(74,222,128,0.1)]">
                     <Target className="w-3.5 h-3.5 text-emerald-400" />
@@ -5096,21 +3854,12 @@ export default function App() {
                     <span>{liveWpm} WPM</span>
                   </div>
 
-                  {/* Secondary Stats (Streak, Timer, Shield, Level, XP): Clean, elegant 75% opacity */}
-                  <div className="hidden xl:flex items-center gap-2.5 text-zinc-300 opacity-80 font-medium pl-1">
+                  {/* Secondary Stats (Streak, Timer): Clean, elegant 75% opacity */}
+                  <div className="hidden lg:flex items-center gap-2.5 text-zinc-300 opacity-80 font-medium pl-1">
                     <span className="text-zinc-700">·</span>
-                    <span className="hover:text-white transition-colors">🔥 {streak}D Streak</span>
+                    <span className="flex items-center gap-1 hover:text-white transition-colors"><Flame className="w-3 h-3 text-amber-400" /> {streak}D Streak</span>
                     <span className="text-zinc-700">·</span>
-                    <span className="hover:text-white transition-colors">⏱️ {formatTimer(testDuration !== null ? Math.max(0, testDuration - elapsed) : elapsed)}</span>
-                    <span className="text-zinc-700">·</span>
-                    <span className="flex items-center gap-1 hover:text-white transition-colors"><Shield className="w-3 h-3 text-zinc-400" /> 10 Shield</span>
-                    <span className="text-zinc-700">·</span>
-                    <span className="hover:text-white transition-colors">🏅 Lv.{userLevel}</span>
-                    <span className="text-zinc-700">·</span>
-                    <span className="flex items-center gap-1 hover:text-white transition-colors">
-                      <span>⭐</span>
-                      <span className="text-zinc-300 font-semibold">{userXp % 500}/500 XP</span>
-                    </span>
+                    <span className="flex items-center gap-1 hover:text-white transition-colors"><Timer className="w-3 h-3 text-zinc-400" /> {formatTimer(testDuration !== null ? Math.max(0, testDuration - elapsed) : elapsed)}</span>
                   </div>
                 </div>
               </div>
@@ -5139,7 +3888,6 @@ export default function App() {
                   className="px-3.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-400 transition-all cursor-pointer flex items-center justify-center gap-1.5 font-mono font-bold text-xs shadow-[0_0_12px_rgba(245,158,11,0.15)] active:scale-95"
                   title="Weekly Challenge Competition"
                 >
-                  <span className="animate-bounce">🏆</span>
                   <span className="hidden sm:inline">Challenge</span>
                 </button>
 
@@ -5149,21 +3897,21 @@ export default function App() {
                     setSidebarCollapsed(!sidebarCollapsed);
                     sfx.playClick();
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-[#121422] border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-all cursor-pointer font-mono font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                  className="hidden lg:flex px-3 py-1.5 rounded-xl bg-[#121422] border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-all cursor-pointer font-mono font-bold text-xs items-center gap-1.5 shadow-sm active:scale-95"
                   title={sidebarCollapsed ? "Show Sidebar Telemetry" : "Hide Sidebar for Focus"}
                 >
                   <Activity className="w-3.5 h-3.5 text-zinc-400" />
                   <span>{sidebarCollapsed ? "Telemetry ◀" : "Focus ▶"}</span>
                 </button>
 
-                {/* Share Button (📸) */}
+                {/* Share Button */}
                 <div className="relative">
                   <button
                     onClick={handleShare}
                     className="w-8 h-8 rounded-xl text-[#8899AA] hover:text-[#00FF88] hover:bg-[#00FF88]/10 border border-zinc-800 transition-all cursor-pointer flex items-center justify-center text-sm shadow-sm active:scale-95"
                     title="Share Performance"
                   >
-                    📸
+                    <Share2 className="w-4 h-4" />
                   </button>
                   {shareFeedback && (
                     <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-[#00FF88] text-[#0D0F1A] text-[9px] font-mono font-extrabold rounded shadow-md z-50 whitespace-nowrap">
@@ -5178,10 +3926,10 @@ export default function App() {
                     setSoundEnabled(!soundEnabled);
                     sfx.playClick();
                   }}
-                  className="w-8 h-8 rounded-xl text-[#8899AA] hover:text-[#00E5FF] hover:bg-[#00E5FF]/10 border border-zinc-800 transition-all cursor-pointer flex items-center justify-center active:scale-95 shadow-sm"
+                  className="w-8 h-8 rounded-xl text-[#8899AA] hover:text-[#F59E0B] hover:bg-[#F59E0B]/10 border border-zinc-800 transition-all cursor-pointer flex items-center justify-center active:scale-95 shadow-sm"
                   title={soundEnabled ? "Mute Click Sound" : "Unmute Click Sound"}
                 >
-                  {soundEnabled ? <Volume2 className="w-4 h-4 text-[#00E5FF] animate-pulse" /> : <VolumeX className="w-4 h-4 text-[#8899AA]" />}
+                  {soundEnabled ? <Volume2 className="w-4 h-4 text-[#F59E0B]" /> : <VolumeX className="w-4 h-4 text-[#8899AA]" />}
                 </button>
 
                 {/* Fullscreen button */}
@@ -5190,7 +3938,7 @@ export default function App() {
                     toggleFullscreen();
                     sfx.playClick();
                   }}
-                  className="w-8 h-8 rounded-xl text-[#8899AA] hover:text-[#00E5FF] transition-all cursor-pointer flex items-center justify-center border border-zinc-800 hover:border-[#00E5FF]/30 hover:bg-[#00E5FF]/10 active:scale-95 shadow-sm"
+                  className="w-8 h-8 rounded-xl text-[#8899AA] hover:text-[#F59E0B] transition-all cursor-pointer flex items-center justify-center border border-zinc-800 hover:border-[#F59E0B]/30 hover:bg-[#F59E0B]/10 active:scale-95 shadow-sm"
                   title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
                 >
                   {isFullscreen ? (
@@ -5205,34 +3953,34 @@ export default function App() {
             {/* Fix #2 — Mode/Difficulty Selector Row (Neutral Default, Gold Accent Active Highlight) */}
             <div
               onWheel={handleHorizontalWheel}
-              className="w-full flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-smooth overscroll-x-contain touch-pan-x bg-[#0A0C16]/90 border border-zinc-800/80 rounded-2xl px-3 py-1.5 shrink-0 mb-3.5 backdrop-blur-xl select-none shadow-xl"
+              className="w-full flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-smooth overscroll-x-contain touch-pan-x bg-[#0A0C16]/90 border border-zinc-800/80 rounded-2xl px-2.5 py-1 shrink-0 mb-2 backdrop-blur-xl select-none shadow-xl"
             >
-              {/* Duration Pills Group */}
-              <div className="flex items-center gap-1 bg-[#121422] p-1 rounded-xl border border-zinc-800/50 shrink-0">
-                {[
-                  { label: "1M", value: 60 },
-                  { label: "2M", value: 120 },
-                  { label: "5M", value: 300 },
-                  { label: "10M", value: 600 },
-                  { label: "∞", value: null }
-                ].map((opt) => (
-                  <button
-                    key={String(opt.label)}
-                    onClick={() => {
-                      setTestDuration(opt.value);
-                      selectStoryForDuration(opt.value);
-                      handleResetSession();
-                      sfx.playClick();
-                    }}
-                    className={`px-2.5 py-1 text-[10px] font-mono rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 border ${
-                      testDuration === opt.value
-                        ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
-                        : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+              {/* Duration Dropdown (custom menu — matches modes/content dropdowns) */}
+              <div className="relative inline-flex items-center shrink-0">
+                <button
+                  ref={durationMenuBtnRef}
+                  onClick={() => {
+                    if (!durationMenuOpen && durationMenuBtnRef.current) {
+                      const r = durationMenuBtnRef.current.getBoundingClientRect();
+                      setDurationMenuPos({ top: r.bottom + 6, left: Math.min(r.left, window.innerWidth - 220) });
+                      setModesMenuOpen(false);
+                      setContentMenuOpen(false);
+                      setAiStoryOpen(false);
+                    }
+                    setDurationMenuOpen(o => !o);
+                    sfx.playClick();
+                  }}
+                  className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                    testDuration !== null
+                      ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
+                  }`}
+                  title="Test duration"
+                >
+                  <Timer className="w-3.5 h-3.5" />
+                  {testDuration === 60 ? '1M' : testDuration === 120 ? '2M' : testDuration === 300 ? '5M' : testDuration === 600 ? '10M' : testDuration === 900 ? '15M' : 'Duration'}
+                  {durationMenuOpen ? ' ▲' : ' ▼'}
+                </button>
               </div>
 
               {/* Gradient Divider */}
@@ -5241,8 +3989,8 @@ export default function App() {
               {/* Mode Pills — All Neutral Default, Gold Active Only */}
               <button
                 onClick={() => { setBotRaceActive(false); setAdaptiveBossActive(false); setFreestyleMode(false); setZenMode(false); handleModeChange("normal"); setSelectedStoryId(null); const defaultL = LESSONS.find(l => l.id === 101) || LESSONS[0]; setCurrentLesson(defaultL); setArcadeActive(false); handleResetSession(); sfx.playClick(); }}
-                className={`px-2.5 py-1 text-[10px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  !freestyleMode && !arcadeActive && !botRaceActive && !adaptiveBossActive && activeModal !== 'practice'
+                className={`px-2.5 py-1 text-[11px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  !freestyleMode && !arcadeActive && !botRaceActive && !adaptiveBossActive && !examMode && activeModal !== 'practice'
                     ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
                     : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
                 }`}
@@ -5254,169 +4002,257 @@ export default function App() {
                   setActiveModal('practice');
                   sfx.playClick();
                 }}
-                className={`px-2.5 py-1 text-[10px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`px-2.5 py-1 text-[11px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1 ${
                   activeModal === 'practice' || (currentLesson.category && currentLesson.category.startsWith("Practice Stories") && !freestyleMode)
                     ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
                     : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
                 }`}
-              >📚 Practice Stories</button>
+              ><BookOpen className="w-3.5 h-3.5" /> Practice Stories</button>
 
-              <div className="relative inline-flex items-center gap-1 shrink-0">
+              {/* AI Story (opens in a popover instead of pushing controls inline) */}
+              <div className="relative inline-flex items-center shrink-0">
                 <button
-                  onClick={() => { setAiStoryOpen(!aiStoryOpen); sfx.playClick(); }}
-                  className={`px-2.5 py-1 text-[10px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  ref={aiStoryBtnRef}
+                  onClick={() => {
+                    if (!aiStoryOpen && aiStoryBtnRef.current) {
+                      const r = aiStoryBtnRef.current.getBoundingClientRect();
+                      setAiStoryPos({ top: r.bottom + 6, left: Math.min(r.left, window.innerWidth - 340) });
+                      setModesMenuOpen(false);
+                    }
+                    setAiStoryOpen(o => !o);
+                    sfx.playClick();
+                  }}
+                  className={`px-2.5 py-1 text-[11px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1 ${
                     aiStoryOpen
                       ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
                       : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
                   }`}
-                >✨ AI Story {aiStoryOpen ? '▲' : '▼'}</button>
-
-                {aiStoryOpen && (
-                  <div className="flex items-center gap-1.5 bg-[#0C0E18] border border-amber-500/40 p-1.5 rounded-xl animate-in fade-in zoom-in-95 duration-150 shrink-0 shadow-2xl">
-                    <input
-                      type="text"
-                      placeholder="Enter topic (e.g. Cyberpunk)..."
-                      value={storyTopic}
-                      onChange={(e) => setStoryTopic(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && storyTopic.trim() && !storyGenerating) {
-                          generateAIStory();
-                        }
-                      }}
-                      autoFocus
-                      disabled={storyGenerating}
-                      className="bg-zinc-900 text-zinc-200 text-[10px] font-mono px-2.5 py-1 rounded-lg outline-none border border-zinc-800 focus:border-[#F59E0B] w-36 sm:w-48 placeholder:text-zinc-600 disabled:opacity-50"
-                    />
-                    <button
-                      onClick={generateAIStory}
-                      disabled={storyGenerating || !storyTopic.trim()}
-                      className="bg-[#F59E0B] hover:bg-[#F59E0B]/90 text-zinc-950 font-extrabold text-[10px] font-mono px-3 py-1 rounded-lg transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shadow-md active:scale-95"
-                    >
-                      {storyGenerating ? '...' : 'Generate'}
-                    </button>
-                    <button
-                      onClick={() => setAiStoryOpen(false)}
-                      className="text-zinc-500 hover:text-white text-[10px] px-1 cursor-pointer"
-                      title="Close"
-                    >✕</button>
-                  </div>
-                )}
+                ><Sparkles className="w-3.5 h-3.5" /> AI Story {aiStoryOpen ? '▲' : '▼'}</button>
               </div>
-
-              <button
-                onClick={() => { setBotRaceActive(true); setAdaptiveBossActive(false); setFreestyleMode(false); setZenMode(false); setArcadeActive(false); handleResetSession(); sfx.playClick(); }}
-                className={`px-2.5 py-1 text-[10px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  botRaceActive
-                    ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
-                }`}
-              >🤖 Bot</button>
-
-              <button
-                onClick={() => { setAdaptiveBossActive(true); setBotRaceActive(false); setFreestyleMode(false); setZenMode(false); setArcadeActive(false); handleResetSession(); sfx.playClick(); }}
-                className={`px-2.5 py-1 text-[10px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  adaptiveBossActive
-                    ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
-                }`}
-              >💀 Boss</button>
-
-              <button
-                onClick={() => { setBotRaceActive(false); setAdaptiveBossActive(false); setActiveModal(null); setArcadeActive(true); setFreestyleMode(false); setZenMode(false); setArcadeScore(0); setArcadeShield(100); setFallingLetters([]); sfx.playClick(); }}
-                className={`px-2.5 py-1 text-[10px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  arcadeActive
-                    ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
-                }`}
-              >🕹️ Arcade</button>
-
-              <button
-                onClick={() => { setBotRaceActive(false); setAdaptiveBossActive(false); setFreestyleMode(true); setZenMode(false); setArcadeActive(false); handleResetSession(); sfx.playClick(); }}
-                className={`px-2.5 py-1 text-[10px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  freestyleMode && !zenMode && !arcadeActive
-                    ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
-                }`}
-              >✍️ Free</button>
-
-              <button
-                onClick={() => { const next = !examMode; setExamMode(next); localStorage.setItem('ribbon_exam_mode', next.toString()); handleResetSession(); sfx.playClick(); }}
-                className={`px-2.5 py-1 text-[10px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  examMode
-                    ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
-                }`}
-                title={examMode ? 'Exam Mode ON — Backspace disabled' : 'Enable Strict Exam Mode'}
-              >🏛️ {examMode ? 'Exam ✓' : 'Exam'}</button>
-
-              <button
-                onClick={() => { setBotRaceActive(false); setAdaptiveBossActive(false); setFreestyleMode(true); setZenMode(true); setArcadeActive(false); handleResetSession(); sfx.playClick(); }}
-                className={`px-2.5 py-1 text-[10px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  freestyleMode && zenMode && !arcadeActive
-                    ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
-                }`}
-              >🧘 Zen</button>
 
               {/* Gradient Divider */}
               <div className="w-px h-4 bg-gradient-to-b from-transparent via-zinc-700 to-transparent shrink-0 mx-1" />
 
-              {/* Content type dropdown */}
-              <select
-                value={activeAppMode}
-                onChange={(e) => {
-                  const mode = e.target.value;
-                  if (mode === "code" || mode === "medical") {
-                    setFreestyleMode(false);
-                    handleModeChange(mode as any);
-                  } else {
-                    handleModeChange("normal");
+              {/* Secondary Modes Dropdown — collapses Bot/Boss/Arcade/Free/Exam/Zen into one control */}
+              <button
+                ref={modesMenuBtnRef}
+                onClick={() => {
+                  if (!modesMenuOpen && modesMenuBtnRef.current) {
+                    const r = modesMenuBtnRef.current.getBoundingClientRect();
+                    setModesMenuPos({ top: r.bottom + 6, left: Math.min(r.left, window.innerWidth - 220) });
+                    setAiStoryOpen(false);
+                    setContentMenuOpen(false);
                   }
+                  setModesMenuOpen(o => !o);
                   sfx.playClick();
                 }}
-                className="bg-transparent text-[#4A5070] hover:text-[#F0F2FF] py-0.5 rounded-full border-none focus:outline-none transition-all cursor-pointer text-[9px] font-mono font-black uppercase tracking-wider shrink-0"
+                className={`px-2.5 py-1 text-[11px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1 ${
+                  botRaceActive || adaptiveBossActive || arcadeActive || freestyleMode || examMode
+                    ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
+                    : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
+                }`}
+                title="More typing modes"
               >
-                <option value="normal">📝 Normal</option>
-                <option value="code">💻 Code</option>
-                <option value="medical">🏥 Medical</option>
-              </select>
+                {botRaceActive ? <Bot className="w-3.5 h-3.5" />
+                  : adaptiveBossActive ? <Skull className="w-3.5 h-3.5" />
+                  : arcadeActive ? <Gamepad2 className="w-3.5 h-3.5" />
+                  : freestyleMode && zenMode ? <Feather className="w-3.5 h-3.5" />
+                  : freestyleMode ? <PenLine className="w-3.5 h-3.5" />
+                  : examMode ? <GraduationCap className="w-3.5 h-3.5" />
+                  : <Sliders className="w-3.5 h-3.5" />}
+                {botRaceActive ? 'Bot' : adaptiveBossActive ? 'Boss' : arcadeActive ? 'Arcade' : freestyleMode && zenMode ? 'Zen' : freestyleMode ? 'Free' : examMode ? 'Exam' : 'Modes'}
+                {modesMenuOpen ? ' ▲' : ' ▼'}
+              </button>
+
+              {/* Gradient Divider */}
+              <div className="w-px h-4 bg-gradient-to-b from-transparent via-zinc-700 to-transparent shrink-0 mx-1" />
+
+              {/* Content type dropdown (custom menu — matches modes dropdown) */}
+              <button
+                ref={contentMenuBtnRef}
+                onClick={() => {
+                  if (!contentMenuOpen && contentMenuBtnRef.current) {
+                    const r = contentMenuBtnRef.current.getBoundingClientRect();
+                    setContentMenuPos({ top: r.bottom + 6, left: Math.min(r.left, window.innerWidth - 220) });
+                    setAiStoryOpen(false);
+                    setModesMenuOpen(false);
+                  }
+                  setContentMenuOpen(o => !o);
+                  sfx.playClick();
+                }}
+                className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-mono font-black uppercase tracking-wider rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  activeAppMode !== 'normal'
+                    ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                    : 'border-transparent text-[#4A5070] hover:text-[#F0F2FF] hover:bg-zinc-800/50'
+                }`}
+                title="Content type"
+              >
+                {activeAppMode === 'code' ? <Keyboard className="w-3.5 h-3.5" />
+                  : activeAppMode === 'medical' ? <Activity className="w-3.5 h-3.5" />
+                  : <BookOpen className="w-3.5 h-3.5" />}
+                {activeAppMode === 'code' ? 'Code' : activeAppMode === 'medical' ? 'Medical' : 'Normal'}
+                {contentMenuOpen ? ' ▲' : ' ▼'}
+              </button>
             </div>
+
+            {/* AI Story popover (fixed-position so it isn't clipped by the strip's overflow) */}
+            {aiStoryOpen && aiStoryPos && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => { setAiStoryOpen(false); sfx.playClick(); }} />
+                <div
+                  className="fixed z-50 flex items-center gap-1.5 bg-[#0C0E18] border border-amber-500/40 p-2 rounded-xl shadow-2xl shadow-black/60"
+                  style={{ top: aiStoryPos.top, left: aiStoryPos.left }}
+                >
+                  <input
+                    type="text"
+                    placeholder="Enter topic (e.g. Cyberpunk)..."
+                    value={storyTopic}
+                    onChange={(e) => setStoryTopic(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && storyTopic.trim() && !storyGenerating) {
+                        generateAIStory();
+                      }
+                    }}
+                    autoFocus
+                    disabled={storyGenerating}
+                    className="bg-zinc-900 text-zinc-200 text-[11px] font-mono px-2.5 py-1 rounded-lg outline-none border border-zinc-800 focus:border-[#F59E0B] w-40 sm:w-52 placeholder:text-zinc-600 disabled:opacity-50"
+                  />
+                  <button
+                    onClick={generateAIStory}
+                    disabled={storyGenerating || !storyTopic.trim()}
+                    className="bg-[#F59E0B] hover:bg-[#F59E0B]/90 text-zinc-950 font-extrabold text-[11px] font-mono px-3 py-1 rounded-lg transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shadow-md active:scale-95"
+                  >
+                    {storyGenerating ? '...' : 'Generate'}
+                  </button>
+                  <button
+                    onClick={() => setAiStoryOpen(false)}
+                    className="text-zinc-500 hover:text-white text-[10px] px-1 cursor-pointer"
+                    title="Close"
+                  >✕</button>
+                </div>
+              </>
+            )}
+
+            {/* Secondary modes dropdown (fixed-position) */}
+            {modesMenuOpen && modesMenuPos && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => { setModesMenuOpen(false); sfx.playClick(); }} />
+                <div
+                  className="fixed z-50 w-48 bg-[#0C0E18] border border-zinc-800 rounded-2xl p-1.5 shadow-2xl shadow-black/60 backdrop-blur-xl"
+                  style={{ top: modesMenuPos.top, left: modesMenuPos.left }}
+                >
+                  <button
+                    onClick={() => { setModesMenuOpen(false); setBotRaceActive(true); setAdaptiveBossActive(false); setFreestyleMode(false); setZenMode(false); setArcadeActive(false); handleResetSession(); sfx.playClick(); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-mono transition-all cursor-pointer ${botRaceActive ? 'bg-[#F59E0B]/20 text-[#F59E0B] font-extrabold' : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white'}`}
+                  ><Bot className="w-3.5 h-3.5" /> Bot Race {botRaceActive && <Check className="w-3.5 h-3.5 ml-auto" />}</button>
+                  <button
+                    onClick={() => { setModesMenuOpen(false); setAdaptiveBossActive(true); setBotRaceActive(false); setFreestyleMode(false); setZenMode(false); setArcadeActive(false); handleResetSession(); sfx.playClick(); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-mono transition-all cursor-pointer ${adaptiveBossActive ? 'bg-[#F59E0B]/20 text-[#F59E0B] font-extrabold' : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white'}`}
+                  ><Skull className="w-3.5 h-3.5" /> Boss {adaptiveBossActive && <Check className="w-3.5 h-3.5 ml-auto" />}</button>
+                  <button
+                    onClick={() => { setModesMenuOpen(false); setBotRaceActive(false); setAdaptiveBossActive(false); setActiveModal(null); setArcadeActive(true); setFreestyleMode(false); setZenMode(false); setArcadeScore(0); setArcadeShield(100); setFallingLetters([]); sfx.playClick(); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-mono transition-all cursor-pointer ${arcadeActive ? 'bg-[#F59E0B]/20 text-[#F59E0B] font-extrabold' : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white'}`}
+                  ><Gamepad2 className="w-3.5 h-3.5" /> Arcade {arcadeActive && <Check className="w-3.5 h-3.5 ml-auto" />}</button>
+                  <button
+                    onClick={() => { setModesMenuOpen(false); setBotRaceActive(false); setAdaptiveBossActive(false); setFreestyleMode(true); setZenMode(false); setArcadeActive(false); handleResetSession(); sfx.playClick(); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-mono transition-all cursor-pointer ${freestyleMode && !zenMode && !arcadeActive ? 'bg-[#F59E0B]/20 text-[#F59E0B] font-extrabold' : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white'}`}
+                  ><PenLine className="w-3.5 h-3.5" /> Free {freestyleMode && !zenMode && !arcadeActive && <Check className="w-3.5 h-3.5 ml-auto" />}</button>
+                  <button
+                    onClick={() => { setModesMenuOpen(false); setBotRaceActive(false); setAdaptiveBossActive(false); setFreestyleMode(true); setZenMode(true); setArcadeActive(false); handleResetSession(); sfx.playClick(); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-mono transition-all cursor-pointer ${freestyleMode && zenMode && !arcadeActive ? 'bg-[#F59E0B]/20 text-[#F59E0B] font-extrabold' : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white'}`}
+                  ><Feather className="w-3.5 h-3.5" /> Zen {freestyleMode && zenMode && !arcadeActive && <Check className="w-3.5 h-3.5 ml-auto" />}</button>
+                  <button
+                    onClick={() => { setModesMenuOpen(false); const next = !examMode; setExamMode(next); localStorage.setItem('ribbon_exam_mode', next.toString()); handleResetSession(); sfx.playClick(); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-mono transition-all cursor-pointer ${examMode ? 'bg-[#F59E0B]/20 text-[#F59E0B] font-extrabold' : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white'}`}
+                    title={examMode ? 'Exam Mode ON — Backspace disabled' : 'Enable Strict Exam Mode'}
+                  ><GraduationCap className="w-3.5 h-3.5" /> Exam {examMode && <Check className="w-3.5 h-3.5 ml-auto" />}</button>
+                </div>
+              </>
+            )}
+
+            {/* Content type dropdown (fixed-position) */}
+            {contentMenuOpen && contentMenuPos && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => { setContentMenuOpen(false); sfx.playClick(); }} />
+                <div
+                  className="fixed z-50 w-44 bg-[#0C0E18] border border-zinc-800 rounded-2xl p-1.5 shadow-2xl shadow-black/60 backdrop-blur-xl"
+                  style={{ top: contentMenuPos.top, left: contentMenuPos.left }}
+                >
+                  <button
+                    onClick={() => { setContentMenuOpen(false); handleModeChange("normal"); sfx.playClick(); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-mono transition-all cursor-pointer ${activeAppMode === 'normal' ? 'bg-[#F59E0B]/20 text-[#F59E0B] font-extrabold' : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white'}`}
+                  ><BookOpen className="w-3.5 h-3.5" /> Normal {activeAppMode === 'normal' && <Check className="w-3.5 h-3.5 ml-auto" />}</button>
+                  <button
+                    onClick={() => { setContentMenuOpen(false); setFreestyleMode(false); handleModeChange("code"); sfx.playClick(); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-mono transition-all cursor-pointer ${activeAppMode === 'code' ? 'bg-[#F59E0B]/20 text-[#F59E0B] font-extrabold' : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white'}`}
+                  ><Keyboard className="w-3.5 h-3.5" /> Code {activeAppMode === 'code' && <Check className="w-3.5 h-3.5 ml-auto" />}</button>
+                  <button
+                    onClick={() => { setContentMenuOpen(false); setFreestyleMode(false); handleModeChange("medical"); sfx.playClick(); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-mono transition-all cursor-pointer ${activeAppMode === 'medical' ? 'bg-[#F59E0B]/20 text-[#F59E0B] font-extrabold' : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white'}`}
+                  ><Activity className="w-3.5 h-3.5" /> Medical {activeAppMode === 'medical' && <Check className="w-3.5 h-3.5 ml-auto" />}</button>
+                </div>
+              </>
+            )}
+
+            {/* Duration dropdown (fixed-position) */}
+            {durationMenuOpen && durationMenuPos && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => { setDurationMenuOpen(false); sfx.playClick(); }} />
+                <div
+                  className="fixed z-50 w-44 bg-[#0C0E18] border border-zinc-800 rounded-2xl p-1.5 shadow-2xl shadow-black/60 backdrop-blur-xl"
+                  style={{ top: durationMenuPos.top, left: durationMenuPos.left }}
+                >
+                  {[
+                    { label: "1M", value: 60 },
+                    { label: "2M", value: 120 },
+                    { label: "5M", value: 300 },
+                    { label: "10M", value: 600 },
+                    { label: "15M", value: 900 },
+                    { label: "Duration", value: null }
+                  ].map((opt) => (
+                    <button
+                      key={String(opt.label)}
+                      onClick={() => {
+                        setDurationMenuOpen(false);
+                        setTestDuration(opt.value);
+                        selectStoryForDuration(opt.value);
+                        handleResetSession();
+                        sfx.playClick();
+                      }}
+                      className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-mono transition-all cursor-pointer ${
+                        testDuration === opt.value
+                          ? 'bg-[#F59E0B]/20 text-[#F59E0B] font-extrabold'
+                          : 'text-zinc-300 hover:bg-zinc-800/50 hover:text-white'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5"><Timer className="w-3.5 h-3.5" /> {opt.label}</span>
+                      {testDuration === opt.value && <Check className="w-3.5 h-3.5" />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             {/* Fix #3 — Story Info Stats Row (Plain text separated by simple dividers ·, no colored background pills) */}
             {!arcadeActive && (
-              <div className="w-full bg-[#11131E] border border-zinc-800/60 px-4 py-2 rounded-xl flex items-center justify-between gap-3 text-xs font-mono select-none mb-3 shrink-0">
+              <div className="w-full bg-[#11131E] border border-zinc-800/60 px-3.5 py-1.5 rounded-xl flex items-center justify-between gap-3 text-xs font-mono select-none mb-2 shrink-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-zinc-300 font-bold uppercase tracking-wider text-[11px] font-sans">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span className="text-zinc-200 font-bold uppercase tracking-wider text-sm font-sans">
                     {freestyleMode ? "FREESTYLE CANVAS" : currentLesson.name}
                   </span>
                 </div>
 
                 <div className="flex flex-row flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+                  {/* Live WPM + ACC (small screens only — topbar pills hide below lg) */}
+                  <span className="lg:hidden text-zinc-700">·</span>
+                  <span className="lg:hidden text-[#F59E0B] font-bold flex items-center gap-1"><Zap className="w-3 h-3" /> {liveWpm} WPM</span>
+                  <span className="lg:hidden text-zinc-700">·</span>
+                  <span className="lg:hidden text-emerald-400 font-bold flex items-center gap-1"><Target className="w-3 h-3" /> {liveAccuracy}% ACC</span>
+
                   {/* Benchmark */}
+                  <span className="text-zinc-700">·</span>
                   <span>BENCHMARK: {speedTarget} WPM</span>
-
-                  <span className="text-zinc-700">·</span>
-
-                  {/* Live Speed */}
-                  <span className="font-bold text-emerald-400">
-                    ⚡ {liveWpm} WPM
-                  </span>
-
-                  <span className="text-zinc-700">·</span>
-
-                  {/* Accuracy (turns red if warning < 90%) */}
-                  <span className={`font-bold ${typedText.length > 0 && liveAccuracy < 90 ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`}>
-                    ACC: {freestyleMode ? "--" : (typedText.length > 0 ? `${liveAccuracy}%` : "100%")}
-                  </span>
-
-                  {/* Ghost PB if available */}
-                  {ghostTimestamps.length > 0 && (
-                    <>
-                      <span className="text-zinc-700">·</span>
-                      <span>👻 GHOST: {ghostPbWpm} PB</span>
-                    </>
-                  )}
 
                   {/* Bot Race Difficulty selector (plain text neutral pills, gold highlight for selected) */}
                   {botRaceActive && (
@@ -5452,31 +4288,31 @@ export default function App() {
                     </>
                   )}
 
-                  {/* Ghost PB / BOT wins / BOSS streak (Plain text with dividers) */}
+                  {/* Mode status (BOT wins / BOSS streak / GHOST PB pill) */}
                   {botRaceActive ? (
                     <>
                       <span className="text-zinc-700">·</span>
-                      <span className="text-zinc-400 font-mono text-[11px]">🤖 BOT: {botWpm} WPM</span>
+                      <span className="text-zinc-400 font-mono text-[11px] flex items-center gap-1"><Bot className="w-3 h-3" /> BOT: {botWpm} WPM</span>
                       <span className="text-zinc-700">·</span>
-                      <span className="text-zinc-400 font-mono text-[11px]">🏆 Wins: {userWins} / 🤖 Bot: {botWins}</span>
+                      <span className="text-zinc-400 font-mono text-[11px] flex items-center gap-1"><Trophy className="w-3 h-3 text-amber-400" /> Wins: {userWins} / <Bot className="w-3 h-3" /> Bot: {botWins}</span>
                     </>
                   ) : adaptiveBossActive ? (
                     <>
                       <span className="text-zinc-700">·</span>
-                      <span className="text-rose-400 font-mono text-[11px] font-bold">💀 BOSS: {bossWpm} WPM</span>
+                      <span className="text-rose-400 font-mono text-[11px] font-bold flex items-center gap-1"><Skull className="w-3 h-3" /> BOSS: {bossWpm} WPM</span>
                       <span className="text-zinc-700">·</span>
-                      <span className="text-zinc-400 font-mono text-[11px]">🔥 STREAK: {bossWinStreak}</span>
+                      <span className="text-zinc-400 font-mono text-[11px] flex items-center gap-1"><Flame className="w-3 h-3 text-[#FF6B35]" /> STREAK: {bossWinStreak}</span>
                     </>
                   ) : ghostTimestamps.length > 0 ? (
-                    <div className="bg-[#0B0C10]/80 border border-[#45A29E]/30 px-2.5 py-0.5 rounded-full flex items-center shadow-[0_0_6px_rgba(69,162,158,0.08)] animate-pulse shrink-0">
-                      <span className="text-zinc-400 font-black tracking-wider text-[8px] sm:text-[9px] uppercase flex items-center gap-1 whitespace-nowrap">
-                        👻 GHOST: {ghostPbWpm} PB
+                    <div className="bg-[#0B0C10]/80 border border-[#45A29E]/30 px-2.5 py-0.5 rounded-full flex items-center shadow-[0_0_6px_rgba(69,162,158,0.08)] shrink-0">
+                      <span className="text-zinc-400 font-black tracking-wider text-[10px] sm:text-[11px] uppercase flex items-center gap-1 whitespace-nowrap">
+                        <Ghost className="w-3 h-3 text-[#45A29E]" /> GHOST: {ghostPbWpm} PB
                       </span>
                     </div>
                   ) : (
                     <div className="bg-[#0B0C10]/40 border border-zinc-800/40 px-2.5 py-0.5 rounded-full flex items-center shrink-0">
-                      <span className="text-zinc-600 font-black tracking-wider text-[8px] sm:text-[9px] uppercase flex items-center gap-1 whitespace-nowrap">
-                        👻 PB: NONE
+                      <span className="text-zinc-600 font-black tracking-wider text-[10px] sm:text-[11px] uppercase flex items-center gap-1 whitespace-nowrap">
+                        <Ghost className="w-3 h-3" /> PB: NONE
                       </span>
                     </div>
                   )}
@@ -5485,7 +4321,7 @@ export default function App() {
             )}
 
             {/* Typing Text Area – taking up the remaining height */}
-            <div className="flex-1 w-full flex flex-col justify-start items-center relative bg-[#0B0C10]/40 border border-zinc-800/60 rounded-[20px] p-6 mb-4 min-h-[300px] shadow-[inset_0_0_40px_rgba(0,0,0,0.3)] overflow-visible">
+            <div className="flex-1 w-full flex flex-col justify-start items-center relative bg-[#0B0C10]/40 border border-zinc-800/60 rounded-[20px] p-4 xl:p-5 mb-2 min-h-[280px] max-h-[50vh] lg:max-h-none shadow-[inset_0_0_40px_rgba(0,0,0,0.3)] overflow-visible">
 
               {/* Pause Screen Overlay */}
               {isPaused && !workoutCompleted && !arcadeActive && (
@@ -5512,8 +4348,8 @@ export default function App() {
               {/* Timed Session Completed Overlay */}
               {timedEndModalOpen && (
                 <div className="absolute inset-0 bg-[#0F0F12]/95 backdrop-blur-md flex flex-col items-center justify-center space-y-6 z-40 animate-in fade-in zoom-in-95 duration-200">
-                  <div className="w-16 h-16 bg-[#00F0FF]/10 rounded-full flex flex-col items-center justify-center border border-[#00F0FF]/30 shadow-[0_0_25px_rgba(0,240,255,0.2)]">
-                    <Timer className="w-8 h-8 text-[#00F0FF] animate-pulse" />
+                  <div className="w-16 h-16 bg-[#F59E0B]/10 rounded-full flex flex-col items-center justify-center border border-[#F59E0B]/30 shadow-[0_0_25px_rgba(245,158,11,0.2)]">
+                    <Timer className="w-8 h-8 text-[#F59E0B] animate-pulse" />
                   </div>
 
                   <div className="text-center">
@@ -5523,9 +4359,9 @@ export default function App() {
 
                   <div className="flex gap-4">
                     {/* WPM Card */}
-                    <div className="bg-[#141A26]/80 border border-[#00F0FF]/30 px-6 py-4 rounded-xl text-center min-w-[120px] shadow-[0_0_15px_rgba(0,240,255,0.1)]">
+                    <div className="bg-[#141A26]/80 border border-[#F59E0B]/30 px-6 py-4 rounded-xl text-center min-w-[120px] shadow-[0_0_15px_rgba(245,158,11,0.1)]">
                       <span className="text-[10px] font-mono text-zinc-500 block uppercase font-bold">Final WPM</span>
-                      <span className="text-2xl font-mono font-black text-[#00F0FF]">
+                      <span className="text-2xl font-mono font-black text-[#F59E0B]">
                         {testDuration ? Math.round((typedText.length / 5) / (testDuration / 60)) : 0}
                       </span>
                     </div>
@@ -5550,7 +4386,7 @@ export default function App() {
                       handleResetSession();
                       sfx.playClick();
                     }}
-                    className="bg-[#00F0FF] hover:bg-[#00F0FF]/90 text-zinc-950 font-black font-mono text-xs px-8 py-3 rounded-full transition-all hover:scale-105 active:scale-95 shadow-lg shadow-[#00F0FF]/20 uppercase tracking-widest cursor-pointer"
+                    className="bg-[#F59E0B] hover:bg-[#F59E0B]/90 text-zinc-950 font-black font-mono text-xs px-8 py-3 rounded-full transition-all hover:scale-105 active:scale-95 shadow-lg shadow-[#F59E0B]/20 uppercase tracking-widest cursor-pointer"
                   >
                     Retry Test
                   </button>
@@ -5615,7 +4451,7 @@ export default function App() {
                   {/* Start typing hint */}
                   {typedText.length === 0 && !freestyleMode && !arcadeActive && (
                     <div className="mb-2 shrink-0 text-center">
-                      <span className="text-[10px] font-mono text-[#00E5FF] italic bg-[#00E5FF]/10 border border-[#00E5FF]/30 px-3 py-1 rounded-full">
+                      <span className="text-[10px] font-mono text-[#F59E0B] italic bg-[#F59E0B]/10 border border-[#F59E0B]/30 px-3 py-1 rounded-full">
                         ← Start typing to begin drill
                       </span>
                     </div>
@@ -5648,15 +4484,15 @@ export default function App() {
                         <span className="break-all whitespace-pre-wrap">{typedText}</span>
                         <span
                           ref={activeCharRef}
-                          className="text-[#00F0FF] font-black scale-110 relative z-10 transition-transform animate-pulse border-b-2 border-[#00F0FF] inline-block min-w-[12px] h-[28px] text-center"
-                          style={{ textShadow: "0 0 10px #00F0FF, 0 0 20px #00F0FF" }}
+                          className="text-[#F59E0B] font-black scale-110 relative z-10 transition-transform animate-pulse border-b-2 border-[#F59E0B] inline-block min-w-[12px] h-[28px] text-center"
+                          style={{ textShadow: "0 0 10px #F59E0B, 0 0 20px #F59E0B" }}
                         >
                           &nbsp;
                         </span>
                         {typedText.length === 0 && (
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <span className="text-[10px] font-mono text-[#00F0FF] uppercase tracking-widest font-black animate-pulse flex items-center justify-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-[#00F0FF] shadow-[0_0_8px_#00F0FF]" />
+                            <span className="text-[10px] font-mono text-[#F59E0B] uppercase tracking-widest font-black animate-pulse flex items-center justify-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-[#F59E0B] shadow-[0_0_8px_#F59E0B]" />
                               Freestyle Mode Active · Type anything you wish
                             </span>
                           </div>
@@ -5682,9 +4518,9 @@ export default function App() {
                     )}
 
                     <div
-                      className="custom-caret absolute bg-[#00F0FF]/25 border-b-2 border-[#00F0FF] pointer-events-none select-none animate-pulse hidden"
+                      className="custom-caret absolute bg-[#F59E0B]/25 border-b-2 border-[#F59E0B] pointer-events-none select-none animate-pulse hidden"
                       style={{
-                        boxShadow: "0 0 10px rgba(0, 240, 255, 0.5)",
+                        boxShadow: "0 0 10px rgba(245, 158, 11, 0.5)",
                         zIndex: 10,
                       }}
                     />
@@ -5692,6 +4528,47 @@ export default function App() {
                 </div>
               )}
             </div>
+
+            {/* Tablet on-screen keyboard (hidden on large desktops that use physical keys) */}
+            {keyboardVisibleOnMobile && (
+              <div className="xl:hidden w-full shrink-0 flex flex-col items-center gap-2 pt-1 pb-2">
+                <div className="w-full flex items-center justify-between select-none font-mono" style={{ fontSize: '11px' }}>
+                  <button
+                    onClick={() => {
+                      const nextLayout = keyboardLayout === 'qwerty' ? 'dvorak' : keyboardLayout === 'dvorak' ? 'colemak' : 'qwerty';
+                      setKeyboardLayout(nextLayout);
+                      sfx.playClick();
+                    }}
+                    className="px-2.5 py-1 rounded-lg border border-zinc-800 bg-[#0B0C10]/60 hover:bg-zinc-850 text-[11px] font-mono uppercase tracking-wider cursor-pointer flex items-center gap-1 group select-none transition-all hover:border-[#F59E0B]/30 hover:text-white"
+                    title="Click to cycle layout (QWERTY -> DVORAK -> COLEMAK)"
+                  >
+                    <span className="text-zinc-500">LAYOUT:</span>
+                    <span className="text-[#F59E0B] font-black group-hover:animate-pulse">{keyboardLayout}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setKeyboardVisibleOnMobile(false);
+                      sfx.playClick();
+                    }}
+                    className="px-2.5 py-1 rounded-lg border border-zinc-800 bg-[#0B0C10]/60 hover:bg-zinc-850 text-[10px] font-mono uppercase tracking-wider cursor-pointer flex items-center gap-1 select-none transition-all hover:border-[#F59E0B]/30 hover:text-white"
+                    title="Hide on-screen keyboard"
+                  >
+                    <Keyboard className="w-3.5 h-3.5 text-[#F59E0B]" />
+                    <span>Hide KB</span>
+                  </button>
+                </div>
+                <div className="w-full max-w-2xl">
+                  <VirtualKeyboard
+                    currentScript={currentScript}
+                    nextExpectedChar={arcadeActive ? null : nextExpectedChar}
+                    layout={keyboardLayout}
+                    physicalKeyPresses={deferredPhysicalKeyPresses}
+                    physicalKeyErrors={deferredPhysicalKeyErrors}
+                    onKeyClick={(charKey) => generateFumbleDrill(charKey)}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Bottom Controls — Large, High-Contrast Gold Accent Buttons */}
             <div className="w-full shrink-0 flex items-center justify-start gap-3 pt-2">
@@ -5721,6 +4598,21 @@ export default function App() {
                     <RefreshCw className="w-4 h-4 text-amber-400" />
                     <span>RESTART (ESC)</span>
                   </button>
+
+                  {/* Show on-screen keyboard again after it was hidden (touch screens) */}
+                  {!keyboardVisibleOnMobile && (
+                    <button
+                      onClick={() => {
+                        setKeyboardVisibleOnMobile(true);
+                        sfx.playClick();
+                      }}
+                      className="xl:hidden px-4 py-2.5 rounded-xl border border-zinc-800 bg-[#121422] text-zinc-400 hover:text-amber-400 hover:border-amber-500/40 text-xs font-mono font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                      title="Show on-screen keyboard"
+                    >
+                      <Keyboard className="w-4 h-4 text-amber-400" />
+                      <span>Show KB</span>
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -5728,13 +4620,10 @@ export default function App() {
 
           {/* Right Column (Sidebar) — Collapsible for 100% Distraction-Free Focus */}
           {!sidebarCollapsed && (
-            <div className="w-[26%] h-full flex flex-col justify-start gap-4 p-5 overflow-y-auto border-l border-zinc-800/40 select-none bg-[#11131E]/90 backdrop-blur-xl transition-all duration-300">
+            <div className="hidden lg:flex w-full lg:w-[26%] h-full flex-col justify-start gap-4 p-5 overflow-y-auto border-l border-zinc-800/40 select-none bg-[#11131E]/90 backdrop-blur-xl transition-all duration-300">
               <RightSidebarWidgets
                 currentScript={currentScript}
-                onScriptToggle={(script) => {
-                  setCurrentScript(script);
-                  sfx.playClick();
-                }}
+                onScriptToggle={handleScriptToggle}
                 liveWpm={liveWpm}
                 liveAccuracy={liveAccuracy}
                 errorCount={fumbles ? Object.values(fumbles as Record<string, number>).reduce((a: number, b: number) => a + b, 0) : 0}
@@ -5742,21 +4631,11 @@ export default function App() {
                 xp={userXp}
                 level={userLevel}
                 keyboardLayout={keyboardLayout}
-                onLayoutToggle={() => {
-                  const nextLayout = keyboardLayout === 'qwerty' ? 'dvorak' : keyboardLayout === 'dvorak' ? 'colemak' : 'qwerty';
-                  setKeyboardLayout(nextLayout);
-                  sfx.playClick();
-                }}
+                onLayoutToggle={handleLayoutToggle}
                 physicalKeyPresses={deferredPhysicalKeyPresses}
                 physicalKeyErrors={deferredPhysicalKeyErrors}
-                onOpenLeaderboard={() => {
-                  setActiveModal('leaderboard');
-                  sfx.playClick();
-                }}
-                onOpenAchievements={() => {
-                  setActiveModal('achievements');
-                  sfx.playClick();
-                }}
+                onOpenLeaderboard={handleOpenLeaderboard}
+                onOpenAchievements={handleOpenAchievements}
               />
             </div>
           )}
@@ -5788,14 +4667,14 @@ export default function App() {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-              className="relative flex flex-col w-full max-w-[280px] h-full bg-[#0E0E11] border-r border-[#00F0FF]/15 p-5 shadow-[0_0_30px_rgba(0,240,255,0.15)] z-10"
+              className="relative flex flex-col w-full max-w-[280px] h-full bg-[#0E0E11] border-r border-[#F59E0B]/15 p-5 shadow-[0_0_30px_rgba(245,158,11,0.15)] z-10"
               style={{
                 background: 'linear-gradient(to bottom, #0E0E11 0%, #0B0C10 100%)',
               }}
             >
               {/* Drawer Header */}
-              <div className="flex items-center justify-between pb-5 border-b border-zinc-800/80 mb-6 animate-pulse">
-                <span className="font-sans text-xl font-black bg-gradient-to-r from-[#FF6B35] via-[#FF007F] to-[#00F0FF] text-transparent bg-clip-text tracking-tighter">
+              <div className="flex items-center justify-between pb-5 border-b border-zinc-800/80 mb-6">
+                <span className="font-sans text-xl font-black bg-gradient-to-r from-amber-100 via-amber-400 to-amber-500 text-transparent bg-clip-text tracking-tighter">
                   Ribbon Menu
                 </span>
                 <button
@@ -5803,7 +4682,7 @@ export default function App() {
                     setMobileDrawerOpen(false);
                     sfx.playClick();
                   }}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-[#00F0FF] hover:bg-[#00F0FF]/10 transition-all cursor-pointer border border-transparent hover:border-[#00F0FF]/20"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-[#F59E0B] hover:bg-[#F59E0B]/10 transition-all cursor-pointer border border-transparent hover:border-[#F59E0B]/20"
                   style={{ fontSize: '18px' }}
                   title="Close Menu"
                 >
@@ -5823,11 +4702,11 @@ export default function App() {
                     sfx.playClick();
                   }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 cursor-pointer text-left w-full ${activeModal === null && !arcadeActive
-                      ? 'text-[#00F0FF] border-[#00F0FF]/30 bg-[#00F0FF]/10 shadow-[0_0_15px_rgba(0,240,255,0.15)] font-bold'
+                      ? 'text-[#F59E0B] border-[#F59E0B]/30 bg-[#F59E0B]/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] font-bold'
                       : 'text-[#C5C6C7] border-transparent hover:text-white hover:bg-zinc-800/40'
                     }`}
                 >
-                  <span className="text-base">⌨️</span>
+                  <Keyboard className="w-4 h-4 shrink-0" />
                   <span className="text-xs font-semibold tracking-wide uppercase">Typing</span>
                 </button>
 
@@ -5840,11 +4719,11 @@ export default function App() {
                     sfx.playClick();
                   }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 cursor-pointer text-left w-full ${activeModal === 'lessons'
-                      ? 'text-[#00F0FF] border-[#00F0FF]/30 bg-[#00F0FF]/10 shadow-[0_0_15px_rgba(0,240,255,0.15)] font-bold'
+                      ? 'text-[#F59E0B] border-[#F59E0B]/30 bg-[#F59E0B]/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] font-bold'
                       : 'text-[#C5C6C7] border-transparent hover:text-white hover:bg-zinc-800/40'
                     }`}
                 >
-                  <span className="text-base">📖</span>
+                  <BookOpen className="w-4 h-4 shrink-0" />
                   <span className="text-xs font-semibold tracking-wide uppercase">Touch Lessons</span>
                 </button>
 
@@ -5857,11 +4736,11 @@ export default function App() {
                     sfx.playClick();
                   }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 cursor-pointer text-left w-full ${activeModal === 'practice'
-                      ? 'text-[#00F0FF] border-[#00F0FF]/30 bg-[#00F0FF]/10 shadow-[0_0_15px_rgba(0,240,255,0.15)] font-bold'
+                      ? 'text-[#F59E0B] border-[#F59E0B]/30 bg-[#F59E0B]/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] font-bold'
                       : 'text-[#C5C6C7] border-transparent hover:text-white hover:bg-zinc-800/40'
                     }`}
                 >
-                  <span className="text-base">📚</span>
+                  <History className="w-4 h-4 shrink-0" />
                   <span className="text-xs font-semibold tracking-wide uppercase">Practice Passages</span>
                 </button>
 
@@ -5877,11 +4756,11 @@ export default function App() {
                     sfx.playClick();
                   }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 cursor-pointer text-left w-full ${arcadeActive
-                      ? 'text-[#00F0FF] border-[#00F0FF]/30 bg-[#00F0FF]/10 shadow-[0_0_15px_rgba(0,240,255,0.15)] font-bold'
+                      ? 'text-[#F59E0B] border-[#F59E0B]/30 bg-[#F59E0B]/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] font-bold'
                       : 'text-[#C5C6C7] border-transparent hover:text-white hover:bg-zinc-800/40'
                     }`}
                 >
-                  <span className="text-base">🎮</span>
+                  <Gamepad2 className="w-4 h-4 shrink-0" />
                   <span className="text-xs font-semibold tracking-wide uppercase">Retro Arcade</span>
                 </button>
 
@@ -5894,11 +4773,11 @@ export default function App() {
                     sfx.playClick();
                   }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 cursor-pointer text-left w-full ${activeModal === 'stats'
-                      ? 'text-[#00F0FF] border-[#00F0FF]/30 bg-[#00F0FF]/10 shadow-[0_0_15px_rgba(0,240,255,0.15)] font-bold'
+                      ? 'text-[#F59E0B] border-[#F59E0B]/30 bg-[#F59E0B]/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] font-bold'
                       : 'text-[#C5C6C7] border-transparent hover:text-white hover:bg-zinc-800/40'
                     }`}
                 >
-                  <span className="text-base">📊</span>
+                  <BarChart3 className="w-4 h-4 shrink-0" />
                   <span className="text-xs font-semibold tracking-wide uppercase">Analytics</span>
                 </button>
 
@@ -5911,11 +4790,11 @@ export default function App() {
                     sfx.playClick();
                   }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 cursor-pointer text-left w-full ${activeModal === 'leaderboard'
-                      ? 'text-[#00F0FF] border-[#00F0FF]/30 bg-[#00F0FF]/10 shadow-[0_0_15px_rgba(0,240,255,0.15)] font-bold'
+                      ? 'text-[#F59E0B] border-[#F59E0B]/30 bg-[#F59E0B]/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] font-bold'
                       : 'text-[#C5C6C7] border-transparent hover:text-white hover:bg-zinc-800/40'
                     }`}
                 >
-                  <span className="text-base">🏆</span>
+                  <Trophy className="w-4 h-4 shrink-0" />
                   <span className="text-xs font-semibold tracking-wide uppercase">Leaderboard</span>
                 </button>
 
@@ -5928,11 +4807,11 @@ export default function App() {
                     sfx.playClick();
                   }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 cursor-pointer text-left w-full ${activeModal === 'achievements'
-                      ? 'text-[#00F0FF] border-[#00F0FF]/30 bg-[#00F0FF]/10 shadow-[0_0_15px_rgba(0,240,255,0.15)] font-bold'
+                      ? 'text-[#F59E0B] border-[#F59E0B]/30 bg-[#F59E0B]/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] font-bold'
                       : 'text-[#C5C6C7] border-transparent hover:text-white hover:bg-zinc-800/40'
                     }`}
                 >
-                  <span className="text-base">🥇</span>
+                  <Award className="w-4 h-4 shrink-0" />
                   <span className="text-xs font-semibold tracking-wide uppercase">Achievements</span>
                 </button>
 
@@ -5945,11 +4824,11 @@ export default function App() {
                     sfx.playClick();
                   }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 cursor-pointer text-left w-full ${activeModal === 'friends'
-                      ? 'text-[#00F0FF] border-[#00F0FF]/30 bg-[#00F0FF]/10 shadow-[0_0_15px_rgba(0,240,255,0.15)] font-bold'
+                      ? 'text-[#F59E0B] border-[#F59E0B]/30 bg-[#F59E0B]/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] font-bold'
                       : 'text-[#C5C6C7] border-transparent hover:text-white hover:bg-zinc-800/40'
                     }`}
                 >
-                  <span className="text-base">👥</span>
+                  <Users className="w-4 h-4 shrink-0" />
                   <span className="text-xs font-semibold tracking-wide uppercase">Friends</span>
                 </button>
 
@@ -5962,11 +4841,11 @@ export default function App() {
                     sfx.playClick();
                   }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 cursor-pointer text-left w-full ${activeModal === 'calendar'
-                      ? 'text-[#00F0FF] border-[#00F0FF]/30 bg-[#00F0FF]/10 shadow-[0_0_15px_rgba(0,240,255,0.15)] font-bold'
+                      ? 'text-[#F59E0B] border-[#F59E0B]/30 bg-[#F59E0B]/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] font-bold'
                       : 'text-[#C5C6C7] border-transparent hover:text-white hover:bg-zinc-800/40'
                     }`}
                 >
-                  <span className="text-base">📅</span>
+                  <Clock className="w-4 h-4 shrink-0" />
                   <span className="text-xs font-semibold tracking-wide uppercase">Calendar</span>
                 </button>
 
@@ -5979,11 +4858,11 @@ export default function App() {
                     sfx.playClick();
                   }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 cursor-pointer text-left w-full ${activeModal === 'settings'
-                      ? 'text-[#00F0FF] border-[#00F0FF]/30 bg-[#00F0FF]/10 shadow-[0_0_15px_rgba(0,240,255,0.15)] font-bold'
+                      ? 'text-[#F59E0B] border-[#F59E0B]/30 bg-[#F59E0B]/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] font-bold'
                       : 'text-[#C5C6C7] border-transparent hover:text-white hover:bg-zinc-800/40'
                     }`}
                 >
-                  <span className="text-base">⚙️</span>
+                  <Settings className="w-4 h-4 shrink-0" />
                   <span className="text-xs font-semibold tracking-wide uppercase">Settings</span>
                 </button>
 
@@ -6002,7 +4881,7 @@ export default function App() {
                     }`}
                   title={soundEnabled ? 'Mute click sounds' : 'Enable click sounds'}
                 >
-                  <span className="text-base">{soundEnabled ? '🔊' : '🔇'}</span>
+                  {soundEnabled ? <Volume2 className="w-4 h-4 shrink-0" /> : <VolumeX className="w-4 h-4 shrink-0" />}
                   <span className="text-xs font-semibold tracking-wide uppercase">
                     {soundEnabled ? 'Sound On' : 'Sound Off'}
                   </span>
@@ -6020,10 +4899,10 @@ export default function App() {
 
       {/* 4. PREMIUM COMPREHENSIVE MODAL VIEW SYSTEM (CENTERED PRO GLASSMORPHIC CONTAINER) */}
       {activeModal !== null && (
-        <div className={`fixed inset-0 z-45 flex items-center justify-center p-3 sm:p-6 md:p-8 select-none ${sidebarExpanded ? 'xl:pl-[256px]' : 'xl:pl-[80px]'} transition-all duration-300 pointer-events-none`}>
+        <div className={`fixed inset-0 z-45 flex items-center justify-center p-3 sm:p-6 md:p-8 select-none ${sidebarExpanded ? 'lg:pl-[256px]' : 'lg:pl-[80px]'} transition-all duration-300 pointer-events-none`}>
           {/* Backdrop (semi-transparent overlay on workspace, dismissed on click) */}
           <div
-            className={`fixed inset-0 bg-[#0F0F12]/75 backdrop-blur-md transition-all duration-300 pointer-events-auto ${sidebarExpanded ? 'xl:left-[240px]' : 'xl:left-[64px]'}`}
+            className={`fixed inset-0 bg-[#0F0F12]/75 backdrop-blur-md transition-all duration-300 pointer-events-auto ${sidebarExpanded ? 'lg:left-[240px]' : 'lg:left-[64px]'}`}
             onClick={() => {
               setActiveModal(null);
               sfx.playClick();
@@ -6214,7 +5093,7 @@ export default function App() {
                             setFilterStoriesByDuration(prev => !prev);
                             sfx.playClick();
                           }}
-                          className="px-2.5 py-1 rounded-xl border border-zinc-700/80 hover:border-cyan-400/60 bg-zinc-800/80 text-[9px] font-mono font-bold uppercase text-cyan-400 cursor-pointer transition-all duration-150"
+                          className="px-2.5 py-1 rounded-xl border border-zinc-700/80 hover:border-amber-400/60 bg-zinc-800/80 text-[9px] font-mono font-bold uppercase text-amber-400 cursor-pointer transition-all duration-150"
                         >
                           {filterStoriesByDuration ? "Show All Stories" : "Filter Duration"}
                         </button>
@@ -6318,7 +5197,7 @@ export default function App() {
                         <button
                           onClick={() => setAnalyticsScriptFilter('english')}
                           className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl font-bold transition-all duration-200 cursor-pointer ${analyticsScriptFilter === 'english'
-                              ? 'bg-gradient-to-r from-cyan-500/20 to-cyan-500/10 text-cyan-400 border border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
+                              ? 'bg-gradient-to-r from-amber-500/20 to-amber-500/10 text-amber-400 border border-amber-500/40 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
                               : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50 border border-transparent'
                             }`}
                         >
@@ -6352,10 +5231,10 @@ export default function App() {
                       </div>
 
                       {/* 2. Avg Speed Card */}
-                      <div className="bg-gradient-to-b from-[#181B30] to-[#121424] p-3.5 rounded-2xl border border-cyan-500/30 hover:border-cyan-500/60 transition-all duration-300 shadow-lg group">
+                      <div className="bg-gradient-to-b from-[#181B30] to-[#121424] p-3.5 rounded-2xl border border-amber-500/30 hover:border-amber-500/60 transition-all duration-300 shadow-lg group">
                         <div className="flex items-center justify-between">
-                          <span className="text-[9px] font-mono text-cyan-400/90 font-bold uppercase tracking-wider">AVG SPEED</span>
-                          <Zap className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+                          <span className="text-[9px] font-mono text-amber-400/90 font-bold uppercase tracking-wider">AVG SPEED</span>
+                          <Zap className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
                         </div>
                         <div className="mt-2 flex items-baseline gap-1">
                           <span className="text-2xl font-mono font-black text-white tracking-tight">{displayAvgWpm}</span>
@@ -6398,7 +5277,7 @@ export default function App() {
                           setActiveModal('history');
                           sfx.playClick();
                         }}
-                        className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-cyan-500/15 border border-zinc-800 hover:border-amber-400/70 hover:from-amber-500/25 hover:to-cyan-500/25 text-center transition-all duration-300 cursor-pointer flex items-center justify-between group shadow-lg"
+                        className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-amber-500/15 border border-zinc-800 hover:border-amber-400/70 hover:from-amber-500/25 hover:to-amber-500/25 text-center transition-all duration-300 cursor-pointer flex items-center justify-between group shadow-lg"
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:rotate-12 transition-transform">
@@ -6753,7 +5632,7 @@ export default function App() {
               {/* E. LEADERBOARD PANEL CONTENT */}
               {activeModal === 'leaderboard' && (
                 <div className="space-y-4">
-                  <div className="p-3.5 bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-cyan-500/15 border border-zinc-800 rounded-2xl flex items-center justify-between">
+                  <div className="p-3.5 bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-amber-500/15 border border-zinc-800 rounded-2xl flex items-center justify-between">
                     <div>
                       <span className="text-[10px] font-mono text-amber-400 font-extrabold uppercase tracking-wider block">Global Leaderboard</span>
                       <p className="text-xs text-zinc-300 font-mono mt-0.5">Real-time standings of elite clackers.</p>
@@ -6782,18 +5661,18 @@ export default function App() {
                     </div>
 
                     {/* Rank 2 */}
-                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-cyan-500/15 via-cyan-500/5 to-transparent border border-cyan-500/30 group hover:scale-[1.01] transition-transform">
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 group hover:scale-[1.01] transition-transform">
                       <div className="flex items-center gap-3.5">
-                        <span className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-black font-mono text-xs flex items-center justify-center">
+                        <span className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-black font-mono text-xs flex items-center justify-center">
                           🥈 2
                         </span>
                         <div className="flex flex-col">
-                          <span className="text-xs font-bold text-zinc-100 group-hover:text-cyan-300 transition-colors">ClackMaster</span>
+                          <span className="text-xs font-bold text-zinc-100 group-hover:text-amber-300 transition-colors">ClackMaster</span>
                           <span className="text-[9px] font-mono text-zinc-400">Linear Red Preset • Rank #2</span>
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className="text-sm font-mono font-black text-cyan-300 block">87 WPM</span>
+                        <span className="text-sm font-mono font-black text-amber-300 block">87 WPM</span>
                         <span className="text-[9px] font-mono text-emerald-400 font-bold block">99.2% Acc</span>
                       </div>
                     </div>
@@ -6851,7 +5730,7 @@ export default function App() {
                   </div>
 
                   {/* Your Personal Best Rank Banner */}
-                  <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-purple-500/15 to-cyan-500/20 border border-amber-500/40 flex items-center justify-between shadow-lg">
+                  <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-purple-500/15 to-amber-500/20 border border-amber-500/40 flex items-center justify-between shadow-lg">
                     <div className="flex items-center gap-3.5">
                       <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-md">
                         <Trophy className="w-5 h-5" />
@@ -6865,7 +5744,7 @@ export default function App() {
                       <span className="text-base font-mono font-black text-amber-400 block">
                         {globalStats.bestWpm > 0 ? `${globalStats.bestWpm} WPM` : 'Unranked'}
                       </span>
-                      <span className="text-[9px] font-mono text-cyan-300 font-bold block">
+                      <span className="text-[9px] font-mono text-amber-300 font-bold block">
                         {globalStats.bestWpm > 0 ? `Rank ~ #${globalStats.bestWpm >= 98 ? 1 : globalStats.bestWpm >= 87 ? 2 : globalStats.bestWpm >= 82 ? 3 : globalStats.bestWpm >= 76 ? 4 : globalStats.bestWpm >= 71 ? 5 : 6}` : 'No test runs recorded'}
                       </span>
                     </div>
@@ -6965,11 +5844,11 @@ export default function App() {
                           setActiveModal('themes');
                           sfx.playClick();
                         }}
-                        className="py-3 px-4 rounded-xl bg-[#161828] border border-zinc-800 hover:border-cyan-400/60 hover:bg-[#1A1D32] text-left transition-all duration-200 cursor-pointer flex items-center gap-3 group shadow-sm"
+                        className="py-3 px-4 rounded-xl bg-[#161828] border border-zinc-800 hover:border-amber-400/60 hover:bg-[#1A1D32] text-left transition-all duration-200 cursor-pointer flex items-center gap-3 group shadow-sm"
                       >
-                        <Palette className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                        <Palette className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
                         <div>
-                          <span className="text-xs font-bold text-zinc-100 block group-hover:text-cyan-300 transition-colors">🎨 Themes Editor</span>
+                          <span className="text-xs font-bold text-zinc-100 block group-hover:text-amber-300 transition-colors">🎨 Themes Editor</span>
                           <span className="text-[9px] text-zinc-400 font-mono mt-0.5 block">Create custom color schemes</span>
                         </div>
                       </button>
@@ -7044,6 +5923,8 @@ export default function App() {
                           localStorage.removeItem("history");
                           localStorage.removeItem("streak");
                           localStorage.removeItem("ranked_title");
+                          localStorage.removeItem("ribbon_user_xp");
+                          setUserXp(0);
                           localStorage.removeItem("physicalKeyPresses");
                           localStorage.removeItem("physicalKeyErrors");
                           setGhostPbWpm(0);
@@ -7085,7 +5966,7 @@ export default function App() {
                             setCalendarMonth(prev => prev - 1);
                           }
                         }}
-                        className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-[#00F0FF] transition-all cursor-pointer font-bold font-mono"
+                        className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-[#F59E0B] transition-all cursor-pointer font-bold font-mono"
                       >
                         ◀
                       </button>
@@ -7102,7 +5983,7 @@ export default function App() {
                             setCalendarMonth(prev => prev + 1);
                           }
                         }}
-                        className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-[#00F0FF] transition-all cursor-pointer font-bold font-mono"
+                        className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-[#F59E0B] transition-all cursor-pointer font-bold font-mono"
                       >
                         ▶
                       </button>
@@ -7136,13 +6017,13 @@ export default function App() {
                           if (sessionCount > 0) {
                             textClass = "text-white font-bold";
                             if (sessionCount === 1 || sessionCount === 2) {
-                              bgClass = "bg-[#00F0FF]/10 border border-[#00F0FF]/30";
+                              bgClass = "bg-[#F59E0B]/10 border border-[#F59E0B]/30";
                             } else if (sessionCount >= 3 && sessionCount <= 5) {
-                              bgClass = "bg-[#00F0FF]/25 border border-[#00F0FF]/55";
-                              glowClass = "shadow-[0_0_8px_rgba(0,240,255,0.15)]";
+                              bgClass = "bg-[#F59E0B]/25 border border-[#F59E0B]/55";
+                              glowClass = "shadow-[0_0_8px_rgba(245,158,11,0.15)]";
                             } else {
-                              bgClass = "bg-[#00F0FF]/40 border border-[#00F0FF]";
-                              glowClass = "shadow-[0_0_12px_rgba(0,240,255,0.35)]";
+                              bgClass = "bg-[#F59E0B]/40 border border-[#F59E0B]";
+                              glowClass = "shadow-[0_0_12px_rgba(245,158,11,0.35)]";
                             }
                           }
 
@@ -7158,7 +6039,7 @@ export default function App() {
                             >
                               <span className={`text-[10px] ${textClass}`}>{dayDate.getDate()}</span>
                               {sessionCount > 0 && (
-                                <span className="text-[7px] text-[#00F0FF] font-black">{sessionCount}x</span>
+                                <span className="text-[7px] text-[#F59E0B] font-black">{sessionCount}x</span>
                               )}
 
                               {/* Hover details tooltip */}
@@ -7184,11 +6065,11 @@ export default function App() {
                     <div className="grid grid-cols-2 gap-3 text-center">
                       <div className="bg-[#0B0C10]/60 p-3 rounded-xl border border-zinc-850">
                         <span className="text-[9px] font-mono text-zinc-500 block">CURRENT STREAK</span>
-                        <span className="text-lg font-mono font-black text-[#FF6B35] mt-1 block">🔥 {streak} Days</span>
+                        <span className="text-lg font-mono font-black text-[#FF6B35] mt-1 block flex items-center justify-center gap-1"><Flame className="w-4 h-4" /> {streak} Days</span>
                       </div>
                       <div className="bg-[#0B0C10]/60 p-3 rounded-xl border border-zinc-850">
                         <span className="text-[9px] font-mono text-zinc-500 block">TOTAL PRACTICE DAYS</span>
-                        <span className="text-lg font-mono font-black text-[#00F0FF] mt-1 block">
+                        <span className="text-lg font-mono font-black text-[#F59E0B] mt-1 block">
                           {(() => {
                             const activeDays = new Set(history.map(item => new Date(item.ts).toDateString()));
                             return activeDays.size;
@@ -7198,7 +6079,7 @@ export default function App() {
                     </div>
                     <div className="p-3 bg-[#0B0C10]/40 rounded-xl border border-zinc-900/60 text-center">
                       <p className="text-[10px] text-zinc-400 font-mono leading-relaxed">
-                        Consistency builds muscle memory. Keep up the flame to secure daily progress toward your <strong className="text-[#00F0FF]">{speedTarget} WPM</strong> speed target!
+                        Consistency builds muscle memory. Keep up the flame to secure daily progress toward your <strong className="text-[#F59E0B]">{speedTarget} WPM</strong> speed target!
                       </p>
                     </div>
                   </div>
@@ -7594,7 +6475,7 @@ export default function App() {
                       ) : (
                         activities.map((act, i) => (
                           <div key={i} className="text-xs flex items-start gap-2.5">
-                            <span className="text-[#00F0FF] font-mono">👤</span>
+                            <span className="text-[#F59E0B] font-mono">👤</span>
                             <div className="flex-1 min-w-0">
                               <p className="text-zinc-300 font-mono">
                                 <strong className="text-white font-bold">{act.user}</strong> {act.action}
@@ -7628,9 +6509,9 @@ export default function App() {
                     </span>
                     <div className="grid grid-cols-2 gap-3">
                       {[
-                        { id: 'dark', name: '🖤 PRO Amber Slate', colors: ['#0D0F1A', '#F59E0B', '#00F0FF', '#10B981'], config: { bg: '#0D0F1A', text: '#A1A1AA', cursor: '#F59E0B', accent: '#F59E0B', error: '#EF4444', correct: '#10B981' } },
-                        { id: 'cyberpunk', name: '🩵 Cyberpunk Neon', colors: ['#0D0914', '#FF007F', '#00F0FF', '#FFE600'], config: { bg: '#0D0914', text: '#94A3B8', cursor: '#00F0FF', accent: '#FF007F', error: '#FF0055', correct: '#00F0FF' } },
-                        { id: 'matrix', name: '🟢 Digital Matrix', colors: ['#05100A', '#00FF66', '#00E5FF', '#00FF00'], config: { bg: '#05100A', text: '#4ADE80', cursor: '#00FF66', accent: '#00FF66', error: '#F87171', correct: '#22C55E' } },
+                        { id: 'dark', name: '🖤 PRO Amber Slate', colors: ['#0D0F1A', '#F59E0B', '#F59E0B', '#10B981'], config: { bg: '#0D0F1A', text: '#A1A1AA', cursor: '#F59E0B', accent: '#F59E0B', error: '#EF4444', correct: '#10B981' } },
+                        { id: 'cyberpunk', name: '🩵 Cyberpunk Neon', colors: ['#0D0914', '#FF007F', '#F59E0B', '#FFE600'], config: { bg: '#0D0914', text: '#94A3B8', cursor: '#F59E0B', accent: '#FF007F', error: '#FF0055', correct: '#F59E0B' } },
+                        { id: 'matrix', name: '🟢 Digital Matrix', colors: ['#05100A', '#00FF66', '#F59E0B', '#00FF00'], config: { bg: '#05100A', text: '#4ADE80', cursor: '#00FF66', accent: '#00FF66', error: '#F87171', correct: '#22C55E' } },
                         { id: 'violet', name: '🪻 Deep Violet', colors: ['#0F0C1B', '#A855F7', '#EC4899', '#3B82F6'], config: { bg: '#0F0C1B', text: '#C084FC', cursor: '#EC4899', accent: '#A855F7', error: '#F43F5E', correct: '#3B82F6' } },
                         { id: 'sunset', name: '🌅 Sunset Glow', colors: ['#1A0B2E', '#FFD3B6', '#FF577F', '#FF9F68'], config: { bg: '#1A0B2E', text: '#FFD3B6', cursor: '#FF577F', accent: '#FF9F68', error: '#E11D48', correct: '#10B981' } }
                       ].map(preset => {
@@ -7773,7 +6654,7 @@ export default function App() {
                         <button
                           onClick={() => setAnalyticsScriptFilter('all')}
                           className={`px-3 py-1 rounded-[8px] font-semibold transition-all ${analyticsScriptFilter === 'all'
-                              ? 'bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/30'
+                              ? 'bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30'
                               : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                             }`}
                         >
@@ -7782,7 +6663,7 @@ export default function App() {
                         <button
                           onClick={() => setAnalyticsScriptFilter('english')}
                           className={`px-3 py-1 rounded-[8px] font-semibold transition-all ${analyticsScriptFilter === 'english'
-                              ? 'bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/30'
+                              ? 'bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30'
                               : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                             }`}
                         >
@@ -7804,7 +6685,7 @@ export default function App() {
                     <div className="grid grid-cols-3 gap-3">
                       <div className="bg-[#181822] p-3 rounded-[12px] border border-zinc-850 text-center">
                         <span className="text-[9px] font-mono text-zinc-500 block">RECORD WPM</span>
-                        <span className="text-base font-mono font-black text-[#00F0FF] block mt-1">
+                        <span className="text-base font-mono font-black text-[#F59E0B] block mt-1">
                           {filteredHistory.length > 0 ? Math.max(...filteredHistory.map(h => h.wpm)) : 0} WPM
                         </span>
                       </div>
@@ -7832,7 +6713,7 @@ export default function App() {
                           filteredHistory.map((run, i) => (
                             <div key={i} className="p-3 flex items-center justify-between text-left">
                               <div className="flex items-center gap-2.5">
-                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0 ${run.script === 'hindi' ? 'bg-[#FF6B35]/15 text-[#FF6B35] border border-[#FF6B35]/30' : 'bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/30'
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0 ${run.script === 'hindi' ? 'bg-[#FF6B35]/15 text-[#FF6B35] border border-[#FF6B35]/30' : 'bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30'
                                   }`}>
                                   {run.script === 'hindi' ? 'HI' : 'EN'}
                                 </span>
@@ -7882,7 +6763,7 @@ export default function App() {
                                 <polyline fill="none" stroke="url(#historyGrad)" strokeWidth="3" points={points} strokeLinecap="round" strokeLinejoin="round" />
                                 <defs>
                                   <linearGradient id="historyGrad" x1="0" y1="0" x2="1" y2="0">
-                                    <stop offset="0%" stopColor="#00F0FF" />
+                                    <stop offset="0%" stopColor="#F59E0B" />
                                     <stop offset="100%" stopColor="#FFB800" />
                                   </linearGradient>
                                 </defs>
@@ -7891,7 +6772,7 @@ export default function App() {
                                   const y = height - ((run.wpm - min) / range) * (height - 30) - 15;
                                   return (
                                     <g key={index} className="group/dot cursor-pointer">
-                                      <circle cx={x} cy={y} r="4" fill="#141419" stroke="#00F0FF" strokeWidth="2" className="hover:scale-155 transition-transform" />
+                                      <circle cx={x} cy={y} r="4" fill="#141419" stroke="#F59E0B" strokeWidth="2" className="hover:scale-155 transition-transform" />
                                       <text x={x} y={y - 8} textAnchor="middle" fontSize="8" fill="#C5C6C7" className="opacity-0 group-hover/dot:opacity-100 transition-opacity font-bold">
                                         {run.wpm}
                                       </text>
@@ -7917,7 +6798,7 @@ export default function App() {
                   <div className="bg-[#181822] border border-zinc-850 p-4 rounded-[12px] flex items-center justify-between">
                     <div>
                       <span className="text-[10px] font-mono text-[#45A29E] uppercase tracking-widest block font-black">Habit Consistency Streak</span>
-                      <h4 className="text-base font-black text-white mt-1">Goal Streak: {goalsStreak} Days 🔥</h4>
+                      <h4 className="text-base font-black text-white mt-1 flex items-center gap-1">Goal Streak: {goalsStreak} Days <Flame className="w-4 h-4 text-[#FF6B35]" /></h4>
                       <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Complete all daily targets before midnight to compound your streak!</p>
                     </div>
                     <div className="w-12 h-12 rounded-full bg-[#FF6B35]/10 border border-[#FF6B35]/20 flex items-center justify-center text-xl shadow-[0_0_12px_rgba(255,107,53,0.1)]">
@@ -7942,7 +6823,7 @@ export default function App() {
                             <span className="text-zinc-400 font-bold">{dailyGoalsProgress.practiceMin} / {dailyGoals.practiceMin} mins</span>
                           </div>
                           <div className="w-full h-2 bg-zinc-950 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full transition-all duration-500 ${isMet ? 'bg-emerald-500' : 'bg-[#00F0FF]'}`} style={{ width: `${percent}%` }} />
+                            <div className={`h-full rounded-full transition-all duration-500 ${isMet ? 'bg-emerald-500' : 'bg-[#F59E0B]'}`} style={{ width: `${percent}%` }} />
                           </div>
                         </div>
                       );
@@ -7997,7 +6878,7 @@ export default function App() {
                           type="number"
                           value={dailyGoals.practiceMin}
                           onChange={(e) => setDailyGoals(prev => ({ ...prev, practiceMin: parseInt(e.target.value) || 10 }))}
-                          className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-white font-mono w-20 text-center focus:outline-none focus:border-[#00F0FF]"
+                          className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-white font-mono w-20 text-center focus:outline-none focus:border-[#F59E0B]"
                         />
                       </div>
                       <div className="flex justify-between items-center gap-4">
@@ -8006,7 +6887,7 @@ export default function App() {
                           type="number"
                           value={dailyGoals.wordsTyped}
                           onChange={(e) => setDailyGoals(prev => ({ ...prev, wordsTyped: parseInt(e.target.value) || 100 }))}
-                          className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-white font-mono w-20 text-center focus:outline-none focus:border-[#00F0FF]"
+                          className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-white font-mono w-20 text-center focus:outline-none focus:border-[#F59E0B]"
                         />
                       </div>
                       <div className="flex justify-between items-center gap-4">
@@ -8015,7 +6896,7 @@ export default function App() {
                           type="number"
                           value={dailyGoals.targetWpm}
                           onChange={(e) => setDailyGoals(prev => ({ ...prev, targetWpm: parseInt(e.target.value) || 30 }))}
-                          className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-white font-mono w-20 text-center focus:outline-none focus:border-[#00F0FF]"
+                          className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-white font-mono w-20 text-center focus:outline-none focus:border-[#F59E0B]"
                         />
                       </div>
                     </div>
@@ -8060,7 +6941,7 @@ export default function App() {
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#00F0FF] shadow-[0_0_8px_#00F0FF]" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B] shadow-[0_0_8px_#F59E0B]" />
                 <h3 className="font-bold text-white tracking-tight uppercase text-xs font-mono">
                   🏆 Weekly Challenge Competition
                 </h3>
@@ -8085,7 +6966,7 @@ export default function App() {
                   <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest font-black">
                     ⏱️ TIME LEFT UNTIL RESET:
                   </span>
-                  <span className="bg-[#45A29E]/25 border border-[#45A29E]/50 px-2 py-0.5 rounded-full font-mono text-[10px] text-[#00F0FF] font-black tracking-widest animate-pulse">
+                  <span className="bg-[#45A29E]/25 border border-[#45A29E]/50 px-2 py-0.5 rounded-full font-mono text-[10px] text-[#F59E0B] font-black tracking-widest animate-pulse">
                     {(() => {
                       const now = new Date();
                       const nextMonday = new Date();
@@ -8111,7 +6992,7 @@ export default function App() {
                 <span className="text-zinc-400 uppercase font-black tracking-widest">🏆 YOUR PB:</span>
                 <span className="text-white font-black text-xs">
                   {weeklyChallengePB ? (
-                    <span className="text-[#00F0FF]">
+                    <span className="text-[#F59E0B]">
                       {weeklyChallengePB.wpm} WPM <span className="text-zinc-500">/</span> {weeklyChallengePB.accuracy}% ACC
                     </span>
                   ) : (
@@ -8128,7 +7009,7 @@ export default function App() {
 
                 {weeklyChallengeLoading ? (
                   <div className="py-12 flex flex-col items-center justify-center gap-2">
-                    <div className="w-8 h-8 rounded-full border-4 border-[#00F0FF]/20 border-t-[#00F0FF] animate-spin" />
+                    <div className="w-8 h-8 rounded-full border-4 border-[#F59E0B]/20 border-t-[#F59E0B] animate-spin" />
                     <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Generating story via Gemini...</span>
                   </div>
                 ) : weeklyChallengeStory ? (
@@ -8138,7 +7019,7 @@ export default function App() {
                     </div>
                     <button
                       onClick={startWeeklyChallenge}
-                      className="w-full py-2.5 bg-gradient-to-r from-[#00F0FF]/30 to-[#45A29E]/30 border border-[#00F0FF]/60 hover:border-[#00F0FF] hover:from-[#00F0FF]/40 hover:to-[#45A29E]/40 text-white font-mono font-black uppercase text-xs rounded-lg transition-all cursor-pointer text-center flex items-center justify-center gap-2"
+                      className="w-full py-2.5 bg-gradient-to-r from-[#F59E0B]/30 to-[#45A29E]/30 border border-[#F59E0B]/60 hover:border-[#F59E0B] hover:from-[#F59E0B]/40 hover:to-[#45A29E]/40 text-white font-mono font-black uppercase text-xs rounded-lg transition-all cursor-pointer text-center flex items-center justify-center gap-2"
                     >
                       <span>⚡</span> Enter Typing Competition
                     </button>
@@ -8147,7 +7028,7 @@ export default function App() {
                   <div className="py-10 flex flex-col items-center justify-center gap-3">
                     <span className="text-3xl opacity-50">📖</span>
                     <p className="text-[10px] font-mono text-zinc-500 text-center leading-relaxed">
-                      Click <span className="text-[#00F0FF] font-black">"Enter Typing Competition"</span> above to load<br />this week's challenge story.
+                      Click <span className="text-[#F59E0B] font-black">"Enter Typing Competition"</span> above to load<br />this week's challenge story.
                     </p>
                   </div>
                 )}
@@ -8182,7 +7063,7 @@ export default function App() {
                           localStorage.setItem(key, JSON.stringify(lb));
                         }
                       }}
-                      className="bg-transparent border-none text-[10px] font-mono font-black text-[#00F0FF] w-20 focus:outline-none"
+                      className="bg-transparent border-none text-[10px] font-mono font-black text-[#F59E0B] w-20 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -8236,7 +7117,7 @@ export default function App() {
                             <span className={item.isUser ? "text-[#FF6B35]" : ""}>{item.name}</span>
                             {item.isUser && <span className="text-[8px] bg-[#FF6B35]/20 text-[#FF6B35] px-1 py-0.5 rounded font-black">YOU</span>}
                           </span>
-                          <span className="col-span-2 text-right text-[#00F0FF] font-black">
+                          <span className="col-span-2 text-right text-[#F59E0B] font-black">
                             {item.wpm}
                           </span>
                           <span className="col-span-2 text-right text-[#45A29E]">
@@ -8280,7 +7161,7 @@ export default function App() {
                         {weeklyHistory.map((item: any, idx: number) => (
                           <div key={idx} className="grid grid-cols-4 px-2 py-1.5 items-center text-zinc-300">
                             <span>{item.weekId}</span>
-                            <span className="text-center text-[#00F0FF] font-bold">{item.wpm} WPM</span>
+                            <span className="text-center text-[#F59E0B] font-bold">{item.wpm} WPM</span>
                             <span className="text-center text-zinc-400">#{item.rank} / {item.totalPlayers}</span>
                             <span className="text-right">
                               {item.badge === "Gold" && <span className="text-[#FFB800] font-black">🥇 GOLD</span>}
@@ -8305,7 +7186,7 @@ export default function App() {
                   setWeeklyChallengeOpen(false);
                   sfx.playClick();
                 }}
-                className="bg-[#00F0FF] hover:bg-[#00F0FF]/90 text-zinc-950 font-bold font-sans text-xs px-5 py-2 rounded-[10px] transition-transform active:scale-95 cursor-pointer shadow-lg shadow-[#00F0FF]/15"
+                className="bg-[#F59E0B] hover:bg-[#F59E0B]/90 text-zinc-950 font-bold font-sans text-xs px-5 py-2 rounded-[10px] transition-transform active:scale-95 cursor-pointer shadow-lg shadow-[#F59E0B]/15"
               >
                 Close Panel
               </button>

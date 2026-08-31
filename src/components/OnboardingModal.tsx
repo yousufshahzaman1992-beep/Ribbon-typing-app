@@ -151,7 +151,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClos
 
             <button
               onClick={() => setStep(2)}
-              className="w-[#100%] w-full py-3.5 rounded-2xl bg-[#6C63FF] hover:bg-[#5B52E8] text-white font-extrabold text-sm transition-all shadow-lg shadow-[#6C63FF]/25 cursor-pointer flex items-center justify-center gap-2 group"
+              className="w-full py-3.5 rounded-2xl bg-[#6C63FF] hover:bg-[#5B52E8] text-white font-extrabold text-sm transition-all shadow-lg shadow-[#6C63FF]/25 cursor-pointer flex items-center justify-center gap-2 group"
             >
               <span>Continue to Baseline Test</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

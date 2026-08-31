@@ -125,13 +125,16 @@ const InvadersGame: React.FC<GameProps> = ({ sfx, score, setScore, gameOver, set
   const activeRef = useRef(false);
   const elapsedRef = useRef(0);
   const spawnRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lettersRef = useRef<FallingLetter[]>([]);
+
+  useEffect(() => { lettersRef.current = letters; }, [letters]);
 
   const getWave = (secs: number) => Math.min(5, 1 + Math.floor(secs / 15));
   const getSpawnMs = (w: number) => [2000, 1500, 1100, 800, 600][w - 1];
   const getSpeed  = (w: number) => [0.5, 0.8, 1.2, 1.6, 2.1][w - 1];
 
   const restart = () => {
-    setShield(100); shieldRef.current = 100; setScore(0); setLetters([]);
+    setShield(100); shieldRef.current = 100; setScore(0); setLetters([]); lettersRef.current = [];
     setGameOver(false); setStarted(false); setWave(1);
     activeRef.current = false; elapsedRef.current = 0;
     if (spawnRef.current) clearInterval(spawnRef.current);
@@ -157,7 +160,9 @@ const InvadersGame: React.FC<GameProps> = ({ sfx, score, setScore, gameOver, set
     spawnRef.current = setInterval(() => {
       const alphas = 'abcdefghijklmnopqrstuvwxyz';
       const spd = getSpeed(wave) + Math.random() * 0.4;
-      setLetters(p => [...p, { id: Date.now() + Math.random(), char: alphas[Math.floor(Math.random() * 26)], x: 10 + Math.random() * 80, y: 0, speed: spd }]);
+      const letter: FallingLetter = { id: Date.now() + Math.random(), char: alphas[Math.floor(Math.random() * 26)], x: 10 + Math.random() * 80, y: 0, speed: spd };
+      lettersRef.current = [...lettersRef.current, letter];
+      setLetters(lettersRef.current);
     }, getSpawnMs(wave));
     return () => { if (spawnRef.current) clearInterval(spawnRef.current); };
   }, [wave, started, gameOver]);
@@ -166,17 +171,18 @@ const InvadersGame: React.FC<GameProps> = ({ sfx, score, setScore, gameOver, set
   useEffect(() => {
     if (!started || gameOver) return;
     const frame = setInterval(() => {
-      setLetters(p => {
-        const moved = p.map(l => ({ ...l, y: l.y + l.speed }));
-        const breached = moved.filter(l => l.y >= 90);
-        if (breached.length > 0) {
-          const next = Math.max(0, shieldRef.current - 15 * breached.length);
-          shieldRef.current = next; setShield(next);
-          if (next <= 0) { setGameOver(true); activeRef.current = false; sfx.playClick(false, true); }
-          else sfx.playClick(false, true);
-        }
-        return moved.filter(l => l.y < 90);
-      });
+      const current = lettersRef.current;
+      const moved = current.map(l => ({ ...l, y: l.y + l.speed }));
+      const breached = moved.filter(l => l.y >= 90);
+      if (breached.length > 0) {
+        const next = Math.max(0, shieldRef.current - 15 * breached.length);
+        shieldRef.current = next; setShield(next);
+        if (next <= 0) { setGameOver(true); activeRef.current = false; sfx.playClick(false, true); }
+        else sfx.playClick(false, true);
+      }
+      const survivors = moved.filter(l => l.y < 90);
+      lettersRef.current = survivors;
+      setLetters(survivors);
     }, 40);
     return () => clearInterval(frame);
   }, [started, gameOver]);
@@ -189,7 +195,13 @@ const InvadersGame: React.FC<GameProps> = ({ sfx, score, setScore, gameOver, set
       }
       if (!activeRef.current || gameOver) return;
       const c = e.key.toLowerCase();
-      setLetters(p => { const i = p.findIndex(l => l.char === c); if (i !== -1) { sfx.playClick(); setScore(s => s + wave * 10); return p.filter((_, idx) => idx !== i); } return p; });
+      const i = lettersRef.current.findIndex(l => l.char === c);
+      if (i !== -1) {
+        sfx.playClick();
+        setScore(s => s + wave * 10);
+        lettersRef.current = lettersRef.current.filter((_, idx) => idx !== i);
+        setLetters(lettersRef.current);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -252,15 +264,23 @@ const WordSprintGame: React.FC<GameProps> = ({ sfx, score, setScore, gameOver, s
     setLevel(lv);
   }, []);
 
-  const restart = () => { setTimeLeft(45); setScore(0); setInput(''); setStreak(0); setGameOver(false); setStarted(false); nextWord(0); };
+  const restart = () => { setTimeLeft(30); setScore(0); setInput(''); setStreak(0); setGameOver(false); setStarted(false); nextWord(0); };
 
   useEffect(() => { nextWord(0); }, []);
 
   useEffect(() => {
     if (!started || gameOver) return;
-    const t = setInterval(() => setTimeLeft(p => { if (p <= 1) { setGameOver(true); clearInterval(t); return 0; } return p - 1; }), 1000);
+    const t = setInterval(() => {
+      setTimeLeft(p => (p <= 1 ? 0 : p - 1));
+    }, 1000);
     return () => clearInterval(t);
   }, [started, gameOver]);
+
+  useEffect(() => {
+    if (started && !gameOver && timeLeft <= 0) {
+      setGameOver(true);
+    }
+  }, [timeLeft, started, gameOver]);
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!started) { setStarted(true); }
@@ -324,12 +344,20 @@ const WhackKeyGame: React.FC<GameProps> = ({ sfx, score, setScore, gameOver, set
   const [started, setStarted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const idRef = useRef(0);
+  const keysRef = useRef<WhackKey[]>([]);
+  const spawnMsRef = useRef(1400);
+  const deadlineRef = useRef(3000);
 
-  const restart = () => { setKeys([]); setTimeLeft(30); setScore(0); setGameOver(false); setStarted(false); setElapsed(0); };
+  const restart = () => { setKeys([]); keysRef.current = []; setTimeLeft(30); setScore(0); setGameOver(false); setStarted(false); setElapsed(0); };
 
   // deadline and spawn interval are derived from elapsed (state, triggers re-renders)
   const deadline  = Math.max(900,  3000 - elapsed * 35);
   const spawnMs   = Math.max(400,  1400 - elapsed * 20);
+
+  useEffect(() => { keysRef.current = keys; }, [keys]);
+  useEffect(() => { spawnMsRef.current = spawnMs; }, [spawnMs]);
+  useEffect(() => { deadlineRef.current = deadline; }, [deadline]);
+
   const getDiffLabel = () => {
     if (deadline > 2400) return { label:'🟢 Beginner', color:'text-[#45A29E]' };
     if (deadline > 1800) return { label:'🔵 Easy',     color:'text-[#00F0FF]' };
@@ -337,41 +365,52 @@ const WhackKeyGame: React.FC<GameProps> = ({ sfx, score, setScore, gameOver, set
     return                      { label:'🔴 Expert',   color:'text-red-400' };
   };
 
-  // Re-create spawn + timer whenever spawnMs changes (i.e. every second)
+  // Self-rescheduling spawn timer — reads latest spawnMs via ref so the
+  // ramp shortens the delay without tearing the timer down every second.
   useEffect(() => {
     if (!started || gameOver) return;
-    const spawn = setInterval(() => {
-      const row = Math.floor(Math.random() * KEYBOARD_ROWS.length);
-      const col = Math.floor(Math.random() * KEYBOARD_ROWS[row].length);
-      const key = KEYBOARD_ROWS[row][col];
-      setKeys(p => {
-        if (p.some(k => k.key === key)) return p;
-        return [...p, { id: idRef.current++, key, row, col, deadline: Date.now() + deadline }];
-      });
-    }, spawnMs);
-    return () => clearInterval(spawn);
-  }, [started, gameOver, spawnMs, deadline]);
+    let spawnTimer: ReturnType<typeof setTimeout> | null = null;
+    const schedule = () => {
+      spawnTimer = setTimeout(() => {
+        const row = Math.floor(Math.random() * KEYBOARD_ROWS.length);
+        const col = Math.floor(Math.random() * KEYBOARD_ROWS[row].length);
+        const key = KEYBOARD_ROWS[row][col];
+        if (!keysRef.current.some(k => k.key === key)) {
+          keysRef.current = [...keysRef.current, { id: idRef.current++, key, row, col, deadline: Date.now() + deadlineRef.current }];
+          setKeys(keysRef.current);
+        }
+        schedule();
+      }, spawnMsRef.current);
+    };
+    schedule();
+    return () => { if (spawnTimer) clearTimeout(spawnTimer); };
+  }, [started, gameOver]);
 
-  // Main clock — increments elapsed (which re-triggers spawn effect above)
+  // Main clock — increments elapsed (which shortens spawn delay via ref above)
   useEffect(() => {
     if (!started || gameOver) return;
     const timer = setInterval(() => {
       setElapsed(e => e + 1);
-      setTimeLeft(p => { if (p <= 1) { setGameOver(true); return 0; } return p - 1; });
+      setTimeLeft(p => (p <= 1 ? 0 : p - 1));
     }, 1000);
     return () => clearInterval(timer);
   }, [started, gameOver]);
+
+  useEffect(() => {
+    if (started && !gameOver && timeLeft <= 0) setGameOver(true);
+  }, [timeLeft, started, gameOver]);
 
   // Expire missed keys
   useEffect(() => {
     if (!started || gameOver) return;
     const expire = setInterval(() => {
       const now = Date.now();
-      setKeys(p => {
-        const expired = p.filter(k => k.deadline < now);
-        if (expired.length > 0) sfx.playClick(false, true);
-        return p.filter(k => k.deadline >= now);
-      });
+      const expired = keysRef.current.filter(k => k.deadline < now);
+      if (expired.length > 0) {
+        sfx.playClick(false, true);
+        keysRef.current = keysRef.current.filter(k => k.deadline >= now);
+        setKeys(keysRef.current);
+      }
     }, 100);
     return () => clearInterval(expire);
   }, [started, gameOver]);
@@ -385,11 +424,12 @@ const WhackKeyGame: React.FC<GameProps> = ({ sfx, score, setScore, gameOver, set
       if (gameOver) return;
       if (!started) setStarted(true);
       const k = e.key.toLowerCase();
-      setKeys(p => {
-        const hit = p.find(key => key.key === k);
-        if (hit) { sfx.playClick(); setScore(s => s + 15); return p.filter(key => key.key !== k); }
-        return p;
-      });
+      if (keysRef.current.some(key => key.key === k)) {
+        sfx.playClick();
+        setScore(s => s + 15);
+        keysRef.current = keysRef.current.filter(key => key.key !== k);
+        setKeys(keysRef.current);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
