@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://ribbon-typing-app.vercel.app/sitemap.xml
+Sitemap: https://ribbon-typing-app.netlify.app/sitemap.xml
