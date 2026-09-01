@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, useTransition } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useTransition, lazy, Suspense } from 'react';
 import { TypingText } from './components/TypingText';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -53,7 +53,6 @@ import {
   Brain
 } from 'lucide-react';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
-import { ArcadeHub } from './components/ArcadeHub';
 import { OnboardingModal } from './components/OnboardingModal';
 import { RightSidebarWidgets } from './components/RightSidebarWidgets';
 import { ToastNotification, ToastItem } from './components/ToastNotification';
@@ -63,6 +62,10 @@ import { STORIES_LIT1 } from './stories_lit1';
 import { PASSAGES } from './passages';
 import { Lesson, SessionHistoryItem } from './types';
 import { generateStory, generateText } from './lib/llmProvider';
+import { buildChallengeUrl, parseChallengeQuery, type ChallengeData } from './lib/challenge';
+
+// Code-split the arcade hub so the mini-games load only when opened
+const ArcadeHub = lazy(() => import('./components/ArcadeHub'));
 
 // Web Audio API Sound Synthesizer for tactile mechanical clacks
 class MechanicalFeedback {
@@ -875,6 +878,17 @@ export default function App() {
     };
   }, []);
 
+  // Parse incoming "beat my score" challenge from a shared link on mount (?challenge=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const parsed = parseChallengeQuery(params.get('challenge'));
+    if (parsed) {
+      setChallengeData(parsed);
+      // Clean the URL so the banner doesn't re-parse on refresh
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   const toggleFullscreen = () => {
     const doc = document as any;
     const docEl = document.documentElement as any;
@@ -1028,6 +1042,11 @@ export default function App() {
   const [workoutCompleted, setWorkoutCompleted] = useState<boolean>(false);
   const [workoutStats, setWorkoutStats] = useState<{ wpm: number; accuracy: number; duration: number } | null>(null);
 
+  // Final timed-test result shown in the results card (also used by share challenge)
+  const [timedResult, setTimedResult] = useState<{ wpm: number; accuracy: number; duration: number } | null>(null);
+  // Incoming "beat my score" challenge from a shared link (?challenge=...)
+  const [challengeData, setChallengeData] = useState<ChallengeData | null>(null);
+
   const [selectedStoryId, setSelectedStoryId] = useState<number | null>(null);
   const [freestyleMode, setFreestyleMode] = useState<boolean>(false);
   const [currentPassageIndex, setCurrentPassageIndex] = useState<number>(0);
@@ -1117,6 +1136,28 @@ export default function App() {
     }
     return "You";
   });
+
+  // Share a finished result as a "beat my score" challenge link
+  const shareScore = useCallback(async (wpm: number, acc: number, durationSec: number) => {
+    const base = window.location.origin + window.location.pathname;
+    const url = buildChallengeUrl(base, username, wpm, acc, durationSec);
+    const text = `I scored ${Math.round(wpm)} WPM with ${Math.round(acc)}% accuracy on Ribbon Typing Coach! Can you beat me?`;
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title: 'Ribbon Typing Challenge', text, url });
+        return;
+      } catch (e) {
+        // user cancelled — fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      addToast('Challenge link copied!', 'Share it and see if your friends can beat your score.', 'info');
+    } catch (e) {
+      addToast('Copy failed', 'Press and hold to copy: ' + url, 'info');
+    }
+  }, [username, addToast]);
+
   const [weeklyLeaderboard, setWeeklyLeaderboard] = useState<any[]>([]);
   const [smartDrillGenerating, setSmartDrillGenerating] = useState<boolean>(false);
   const [focusBadgeEarned, setFocusBadgeEarned] = useState<boolean>(() => {
@@ -1874,6 +1915,9 @@ export default function App() {
     const accuracy = finalTyped.length > 0 ? Math.round((correctsCount / finalTyped.length) * 100) : 100;
     const finalAccuracy = Math.min(100, Math.max(0, accuracy));
     const finalWpm = Math.round((finalTyped.length / 5) / (testDuration / 60));
+
+    // Store the result for the results card / share challenge
+    setTimedResult({ wpm: finalWpm, accuracy: finalAccuracy, duration: testDuration });
 
     // Award XP for the timed session
     awardXp(finalWpm, finalAccuracy);
@@ -2850,6 +2894,7 @@ export default function App() {
     setElapsed(0);
     setWorkoutCompleted(false);
     setWorkoutStats(null);
+    setTimedResult(null);
     setIsPaused(false);
     setTimedEndModalOpen(false);
     setCurrentPassageIndex(0);
@@ -3366,6 +3411,23 @@ export default function App() {
     }
   };
 
+  // Kick off a fresh timed test from a received challenge (defaults to 60s)
+  const startChallengeTest = useCallback(() => {
+    setTimedEndModalOpen(false);
+    setWorkoutCompleted(false);
+    setFreestyleMode(false);
+    setBotRaceActive(false);
+    setAdaptiveBossActive(false);
+    setArcadeActive(false);
+    setExamMode(false);
+    setActiveAppMode('normal');
+    const durationSec = challengeData ? challengeData.minutes * 60 : 60;
+    setTestDuration(durationSec);
+    selectStoryForDuration(durationSec);
+    handleResetSession();
+    sfx.playClick();
+  }, [handleResetSession, challengeData]);
+
   const getThemeStyles = () => {
     switch (activeTheme) {
       case 'light':
@@ -3431,13 +3493,45 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen text-[#C5C6C7] flex items-stretch xl:overflow-hidden font-sans relative selection:bg-[#F59E0B] selection:text-[#0B0C10]"
+      className="min-h-screen text-[#C5C6C7] flex items-stretch xl:overflow-hidden font-sans relative selection:bg-[#F59E0B] selection:text-[#0B0C10] pb-[env(safe-area-inset-bottom)]"
       style={{ background: themeConfig.rootBg }}
     >
       {goalToast && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#141419] border-2 border-[#F59E0B] p-4 rounded-[16px] shadow-[0_0_25px_rgba(245,158,11,0.25)] max-w-sm flex items-center gap-3 animate-bounce">
           <div className="text-2xl">🏆</div>
           <p className="text-xs text-white font-mono leading-tight whitespace-pre-line">{goalToast}</p>
+        </div>
+      )}
+
+      {/* Incoming "beat my score" challenge banner */}
+      {challengeData && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="bg-[#0C0E18] border border-[#F59E0B]/50 rounded-2xl p-3.5 shadow-2xl shadow-black/60 backdrop-blur-xl flex items-center gap-3">
+            <div className="w-10 h-10 shrink-0 rounded-full bg-[#F59E0B]/15 flex items-center justify-center border border-[#F59E0B]/40">
+              <Flame className="w-5 h-5 text-[#F59E0B]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-white truncate">
+                {challengeData.name} scored <span className="text-[#F59E0B] font-black">{challengeData.wpm} WPM</span>
+                {challengeData.acc > 0 && <span> at {challengeData.acc}% acc</span>}
+              </p>
+              <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Think you can beat it? Take the {challengeData.minutes > 1 ? `${challengeData.minutes}-minute` : '60-second'} test.</p>
+            </div>
+            <button
+              onClick={() => {
+                setChallengeData(null);
+                startChallengeTest();
+              }}
+              className="shrink-0 bg-[#F59E0B] hover:bg-[#F59E0B]/90 text-zinc-950 font-black text-[11px] font-mono px-3.5 py-2 rounded-xl transition-all cursor-pointer uppercase tracking-wider shadow-lg shadow-[#F59E0B]/20"
+            >
+              Beat It
+            </button>
+            <button
+              onClick={() => setChallengeData(null)}
+              className="shrink-0 text-zinc-500 hover:text-white text-xs px-1 cursor-pointer"
+              title="Dismiss"
+            >✕</button>
+          </div>
         </div>
       )}
       <style>{`
@@ -4347,58 +4441,90 @@ export default function App() {
 
               {/* Timed Session Completed Overlay */}
               {timedEndModalOpen && (
-                <div className="absolute inset-0 bg-[#0F0F12]/95 backdrop-blur-md flex flex-col items-center justify-center space-y-6 z-40 animate-in fade-in zoom-in-95 duration-200">
-                  <div className="w-16 h-16 bg-[#F59E0B]/10 rounded-full flex flex-col items-center justify-center border border-[#F59E0B]/30 shadow-[0_0_25px_rgba(245,158,11,0.2)]">
-                    <Timer className="w-8 h-8 text-[#F59E0B] animate-pulse" />
-                  </div>
-
-                  <div className="text-center">
-                    <h3 className="text-lg font-mono text-zinc-200 uppercase tracking-widest font-black">Time's Up!</h3>
-                    <p className="text-xs text-zinc-500 font-mono mt-1">Your session completed successfully.</p>
-                  </div>
-
-                  <div className="flex gap-4">
-                    {/* WPM Card */}
-                    <div className="bg-[#141A26]/80 border border-[#F59E0B]/30 px-6 py-4 rounded-xl text-center min-w-[120px] shadow-[0_0_15px_rgba(245,158,11,0.1)]">
-                      <span className="text-[10px] font-mono text-zinc-500 block uppercase font-bold">Final WPM</span>
-                      <span className="text-2xl font-mono font-black text-[#F59E0B]">
-                        {testDuration ? Math.round((typedText.length / 5) / (testDuration / 60)) : 0}
-                      </span>
+                <div className="absolute inset-0 bg-[#0F0F12]/95 backdrop-blur-md flex flex-col items-center justify-center z-40 animate-in fade-in zoom-in-95 duration-200 px-4 overflow-y-auto">
+                  <div className="w-full max-w-sm flex flex-col items-center gap-5 py-6">
+                    <div className="w-16 h-16 bg-[#F59E0B]/10 rounded-full flex flex-col items-center justify-center border border-[#F59E0B]/30 shadow-[0_0_25px_rgba(245,158,11,0.2)]">
+                      <Timer className="w-8 h-8 text-[#F59E0B] animate-pulse" />
                     </div>
 
-                    {/* Accuracy Card */}
-                    <div className="bg-[#141A26]/80 border border-[#45A29E]/30 px-6 py-4 rounded-xl text-center min-w-[120px] shadow-[0_0_15px_rgba(69,162,158,0.1)]">
-                      <span className="text-[10px] font-mono text-zinc-500 block uppercase font-bold">Accuracy</span>
-                      <span className="text-2xl font-mono font-black text-[#45A29E]">
-                        {freestyleMode ? "N/A" : (() => {
-                          let correctsCount = 0;
-                          for (let i = 0; i < typedText.length; i++) {
-                            if (typedText[i] === targetText[i]) correctsCount++;
-                          }
-                          return typedText.length > 0 ? `${Math.round((correctsCount / typedText.length) * 100)}%` : "100%";
-                        })()}
-                      </span>
+                    <div className="text-center">
+                      <h3 className="text-xl font-mono text-zinc-200 uppercase tracking-widest font-black">Time's Up!</h3>
+                      <p className="text-xs text-zinc-500 font-mono mt-1">Your session completed successfully.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 w-full">
+                      {/* WPM Card */}
+                      <div className="bg-[#141A26]/80 border border-[#F59E0B]/30 px-4 py-5 rounded-xl text-center shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+                        <span className="text-[10px] font-mono text-zinc-500 block uppercase font-bold">Final WPM</span>
+                        <span className="text-4xl font-mono font-black text-[#F59E0B] block mt-1">
+                          {timedResult ? timedResult.wpm : (testDuration ? Math.round((typedText.length / 5) / (testDuration / 60)) : 0)}
+                        </span>
+                      </div>
+
+                      {/* Accuracy Card */}
+                      <div className="bg-[#141A26]/80 border border-[#F59E0B]/30 px-4 py-5 rounded-xl text-center shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+                        <span className="text-[10px] font-mono text-zinc-500 block uppercase font-bold">Accuracy</span>
+                        <span className="text-4xl font-mono font-black text-[#F59E0B] block mt-1">
+                          {timedResult ? `${timedResult.accuracy}%` : (() => {
+                            let correctsCount = 0;
+                            for (let i = 0; i < typedText.length; i++) {
+                              if (typedText[i] === targetText[i]) correctsCount++;
+                            }
+                            return typedText.length > 0 ? `${Math.round((correctsCount / typedText.length) * 100)}%` : "100%";
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2.5 w-full">
+                      <button
+                        onClick={() => {
+                          const w = timedResult ? timedResult.wpm : (testDuration ? Math.round((typedText.length / 5) / (testDuration / 60)) : 0);
+                          const acc = timedResult ? timedResult.accuracy : (() => {
+                            let correctsCount = 0;
+                            for (let i = 0; i < typedText.length; i++) {
+                              if (typedText[i] === targetText[i]) correctsCount++;
+                            }
+                            return typedText.length > 0 ? Math.round((correctsCount / typedText.length) * 100) : 100;
+                          })();
+                          shareScore(w, acc, testDuration || 60);
+                          sfx.playClick();
+                        }}
+                        className="bg-[#F59E0B] hover:bg-[#F59E0B]/90 text-zinc-950 font-black font-mono text-xs px-8 py-3 rounded-full transition-all hover:scale-[1.02] active:scale-95 shadow-lg shadow-[#F59E0B]/20 uppercase tracking-widest cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Share2 className="w-3.5 h-3.5" /> Challenge a Friend
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          handleResetSession();
+                          sfx.playClick();
+                        }}
+                        className="bg-zinc-900 hover:bg-zinc-800 text-white font-mono font-bold text-xs px-8 py-3 rounded-full border border-zinc-700 transition-all cursor-pointer uppercase tracking-widest flex items-center justify-center gap-2"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Retry Test
+                      </button>
                     </div>
                   </div>
-
-                  <button
-                    onClick={() => {
-                      handleResetSession();
-                      sfx.playClick();
-                    }}
-                    className="bg-[#F59E0B] hover:bg-[#F59E0B]/90 text-zinc-950 font-black font-mono text-xs px-8 py-3 rounded-full transition-all hover:scale-105 active:scale-95 shadow-lg shadow-[#F59E0B]/20 uppercase tracking-widest cursor-pointer"
-                  >
-                    Retry Test
-                  </button>
                 </div>
               )}
 
               {arcadeActive ? (
-                /* ARCADE HUB — 4 mini-games */
-                <ArcadeHub
-                  sfx={sfx}
-                  onClose={() => { setArcadeActive(false); sfx.playClick(); }}
-                />
+                /* ARCADE HUB — 4 mini-games (code-split) */
+                <Suspense fallback={
+                  <div className="flex flex-col items-center justify-center text-center space-y-4 max-w-md w-full py-6 select-none">
+                    <div className="w-14 h-14 bg-[#FFB800]/10 rounded-full flex items-center justify-center text-[#FFB800] border border-[#FFB800]/20 shadow-[0_0_20px_rgba(255,184,0,0.15)] animate-pulse">
+                      <Gamepad2 className="w-7 h-7" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white tracking-tight">Loading Arcade Hub…</h3>
+                    <p className="text-xs text-zinc-500 mt-1 font-mono">Loading game engines and sound banks</p>
+                  </div>
+                }>
+                  <ArcadeHub
+                    sfx={sfx}
+                    onClose={() => { setArcadeActive(false); sfx.playClick(); }}
+                  />
+                </Suspense>
               ) : workoutCompleted ? (
                 /* WORKOUT COMPLETED */
                 <div className="flex flex-col items-center justify-center text-center space-y-4 max-w-md w-full py-6 select-none animate-in fade-in zoom-in-95 duration-300">
@@ -4444,6 +4570,19 @@ export default function App() {
                       Next Stage
                     </button>
                   </div>
+
+                  {workoutStats && (
+                    <button
+                      onClick={() => {
+                        shareScore(workoutStats.wpm, workoutStats.accuracy, workoutStats.duration);
+                        sfx.playClick();
+                      }}
+                      className="w-full flex items-center justify-center gap-2 bg-[#F59E0B]/10 hover:bg-[#F59E0B]/20 border border-[#F59E0B]/40 text-[#F59E0B] font-black font-mono text-xs py-3 rounded-[12px] transition-all cursor-pointer shadow-lg shadow-[#F59E0B]/10"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      Challenge a Friend
+                    </button>
+                  )}
                 </div>
               ) : (
                 /* STANDARD ACTIVE TEXT AREA */
@@ -5946,6 +6085,20 @@ export default function App() {
                         {resetMessage}
                       </div>
                     )}
+                  </div>
+
+                  {/* Settings footer — legal links */}
+                  <div className="pt-2 text-center">
+                    <a
+                      href="/privacy.html"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-mono text-zinc-600 hover:text-[#F59E0B] transition-colors"
+                    >
+                      Privacy Policy
+                    </a>
+                    <span className="text-zinc-700 mx-2">·</span>
+                    <span className="text-[10px] font-mono text-zinc-700">Ribbon Typing Coach</span>
                   </div>
                 </div>
               )}

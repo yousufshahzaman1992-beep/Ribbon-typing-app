@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0B0C10"/>
+      <stop offset="100%" stop-color="#1a1b2e"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#FCD34D"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="1060" cy="120" r="220" fill="#F59E0B" opacity="0.06"/>
+  <circle cx="120" cy="520" r="260" fill="#F59E0B" opacity="0.05"/>
+  <rect x="120" y="60" width="8" height="510" fill="url(#gold)" rx="4"/>
+  <text x="160" y="200" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="bold" fill="#FFFFFF">Ribbon Typing Coach</text>
+  <text x="160" y="290" font-family="Arial, Helvetica, sans-serif" font-size="40" fill="#F59E0B" font-weight="bold">Free Typing Speed Test</text>
+  <text x="160" y="370" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#A1A1AA">Test your WPM &amp; accuracy in 60 seconds.</text>
+  <text x="160" y="415" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#A1A1AA">Challenge your friends to beat your score.</text>
+  <rect x="160" y="460" width="300" height="64" rx="32" fill="#F59E0B"/>
+  <text x="310" y="501" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="bold" fill="#0B0C10" text-anchor="middle">Start Typing</text>
+</svg>
