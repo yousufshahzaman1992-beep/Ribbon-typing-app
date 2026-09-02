@@ -3,7 +3,16 @@ import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
+import sharp from "sharp";
 import { generateStory, generateText, getLLMProviderStatus } from "./src/lib/llmProvider";
+import {
+  insertScore,
+  toLeaderboardResponse,
+  LeaderboardEntry,
+  LeaderboardResponse,
+} from "./src/lib/leaderboard";
+import { buildScorecardSvg } from "./src/lib/ogCard";
+import { parseChallengeQuery } from "./src/lib/challenge";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 dotenv.config();
@@ -273,6 +282,119 @@ app.get("/api/llm-status", (_req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 6. Shared Weekly Leaderboard
+// ─────────────────────────────────────────────────────────────────────────────
+const LEADERBOARD_LIMIT = 100;
+const leaderboardFile = () => path.join(process.cwd(), "leaderboard-data.json");
+
+function readLeaderboard(): LeaderboardEntry[] {
+  try {
+    const file = leaderboardFile();
+    if (fs.existsSync(file)) {
+      const raw = JSON.parse(fs.readFileSync(file, "utf8"));
+      return Array.isArray(raw) ? raw : [];
+    }
+  } catch (e) {
+    console.error("[Leaderboard] Failed to read store:", e);
+  }
+  return [];
+}
+
+function writeLeaderboard(entries: LeaderboardEntry[]) {
+  try {
+    fs.writeFileSync(leaderboardFile(), JSON.stringify(entries), "utf8");
+  } catch (e) {
+    console.error("[Leaderboard] Failed to write store:", e);
+  }
+}
+
+app.get("/api/leaderboard", (req, res) => {
+  const weekId = typeof req.query.weekId === "string" ? req.query.weekId : "";
+  if (!weekId) {
+    return res.status(400).json({ error: "weekId is required" });
+  }
+  const response: LeaderboardResponse = toLeaderboardResponse(readLeaderboard(), weekId, 10);
+  res.set("Cache-Control", "no-store");
+  res.json(response);
+});
+
+app.post("/api/leaderboard", (req, res) => {
+  const { name, wpm, accuracy, weekId } = req.body || {};
+  if (typeof weekId !== "string" || !weekId) {
+    return res.status(400).json({ error: "weekId is required" });
+  }
+  const score: LeaderboardEntry = {
+    name: typeof name === "string" ? name : "Anonymous",
+    wpm: typeof wpm === "number" ? wpm : 0,
+    accuracy: typeof accuracy === "number" ? accuracy : 0,
+    weekId,
+    timestamp: Date.now(),
+  };
+  const entries = insertScore(readLeaderboard(), score, LEADERBOARD_LIMIT);
+  writeLeaderboard(entries);
+  const response: LeaderboardResponse = toLeaderboardResponse(entries, weekId, 10);
+  res.set("Cache-Control", "no-store");
+  res.json(response);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. Dynamic OG Scorecard Image (for shared challenge links)
+// ─────────────────────────────────────────────────────────────────────────────
+app.get("/api/og-card", async (req, res) => {
+  const name = typeof req.query.name === "string" ? req.query.name : "A friend";
+  const wpm = parseInt(String(req.query.wpm || "0"), 10);
+  const acc = parseInt(String(req.query.acc || "0"), 10);
+  const minutes = parseInt(String(req.query.minutes || "1"), 10);
+
+  const svg = buildScorecardSvg({ name, wpm, acc, minutes });
+  try {
+    const png = await sharp(Buffer.from(svg)).png().toBuffer();
+    res.set("Content-Type", "image/png");
+    res.set("Cache-Control", "public, max-age=3600");
+    res.send(png);
+  } catch (e) {
+    console.error("[OG-Card] Rendering failed:", e);
+    res.status(500).json({ error: "Failed to render scorecard" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. Practice Reminder Opt-ins (email capture)
+// ─────────────────────────────────────────────────────────────────────────────
+const remindersFile = () => path.join(process.cwd(), "reminders-data.json");
+
+function readReminders(): string[] {
+  try {
+    const file = remindersFile();
+    if (fs.existsSync(file)) {
+      const raw = JSON.parse(fs.readFileSync(file, "utf8"));
+      return Array.isArray(raw) ? raw : [];
+    }
+  } catch (e) {
+    console.error("[Reminders] Failed to read store:", e);
+  }
+  return [];
+}
+
+app.post("/api/reminders", (req, res) => {
+  const { email } = req.body || {};
+  const clean = typeof email === "string" ? email.trim().toLowerCase() : "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+    return res.status(400).json({ error: "A valid email is required" });
+  }
+  const emails = readReminders();
+  if (!emails.includes(clean)) {
+    emails.push(clean);
+    try {
+      fs.writeFileSync(remindersFile(), JSON.stringify(emails), "utf8");
+    } catch (e) {
+      console.error("[Reminders] Failed to write store:", e);
+    }
+  }
+  res.json({ ok: true });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 6. Vite / Static File Serving
 // ─────────────────────────────────────────────────────────────────────────────
 async function startServer() {
@@ -284,6 +406,40 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
+
+    // Dynamic social meta tags for shared "beat me" challenge links so
+    // crawlers (WhatsApp, Twitter/X, Facebook, Discord) render a scorecard.
+    app.get("/", (req, res) => {
+      const indexFile = path.join(distPath, "index.html");
+      let html: string;
+      try {
+        html = fs.readFileSync(indexFile, "utf8");
+      } catch (e) {
+        return res.status(404).send("Not found");
+      }
+
+      const parsed = parseChallengeQuery(req.query.challenge as string | null);
+      if (!parsed) return res.send(html);
+
+      const origin = `${req.protocol}://${req.get("host")}`;
+      const cardUrl = `${origin}/api/og-card?name=${encodeURIComponent(parsed.name)}&wpm=${parsed.wpm}&acc=${parsed.acc}&minutes=${parsed.minutes}`;
+      const title = `Can you beat ${parsed.name}'s ${parsed.wpm} WPM?`;
+      const description = `${parsed.name} scored ${parsed.wpm} WPM with ${parsed.acc}% accuracy on Ribbon Typing Coach. Take the ${parsed.minutes}-minute test and take the crown!`;
+      const meta = [
+        `<meta property="og:title" content="${title}" />`,
+        `<meta property="og:description" content="${description}" />`,
+        `<meta property="og:image" content="${cardUrl}" />`,
+        `<meta property="og:image:width" content="1200" />`,
+        `<meta property="og:image:height" content="630" />`,
+        `<meta name="twitter:card" content="summary_large_image" />`,
+        `<meta name="twitter:title" content="${title}" />`,
+        `<meta name="twitter:description" content="${description}" />`,
+        `<meta name="twitter:image" content="${cardUrl}" />`,
+      ].join("\n    ");
+      html = html.replace("<head>", `<head>\n    ${meta}`);
+      res.send(html);
+    });
+
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));

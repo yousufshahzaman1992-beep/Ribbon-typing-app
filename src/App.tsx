@@ -50,7 +50,8 @@ import {
   Ghost,
   Share2,
   Shuffle,
-  Brain
+  Brain,
+  Mail
 } from 'lucide-react';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { OnboardingModal } from './components/OnboardingModal';
@@ -1166,6 +1167,41 @@ export default function App() {
     }
     return false;
   });
+
+  // Practice reminder email capture (settings)
+  const [reminderEmail, setReminderEmail] = useState<string>(() => {
+    if (typeof localStorage !== "undefined") {
+      return localStorage.getItem("ribbon_email") || "";
+    }
+    return "";
+  });
+  const [reminderSaving, setReminderSaving] = useState<boolean>(false);
+
+  const saveReminderEmail = async () => {
+    const clean = reminderEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+      addToast('Invalid email', 'Please enter a valid email address to enable reminders.', 'info');
+      return;
+    }
+    localStorage.setItem("ribbon_email", clean);
+    setReminderSaving(true);
+    try {
+      const res = await fetch("/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: clean }),
+      });
+      if (res.ok) {
+        addToast('Reminder enabled!', 'We will nudge you to practice when a new weekly challenge drops.', 'info');
+      } else {
+        addToast('Saved on device', 'Email stored locally; sync available once online services connect.', 'info');
+      }
+    } catch (e) {
+      addToast('Saved on device', 'Email stored locally; sync available once online services connect.', 'info');
+    } finally {
+      setReminderSaving(false);
+    }
+  };
 
   // Bot Race & Boss Battle state
   const [botRaceActive, setBotRaceActive] = useState<boolean>(false);
@@ -2717,6 +2753,9 @@ export default function App() {
                 localStorage.setItem(`ribbon_weekly_leaderboard_${weekId}`, JSON.stringify(lb));
                 setWeeklyLeaderboard(lb);
 
+                // Best-effort push to the shared leaderboard server.
+                submitWeeklyScoreToServer(weekId, wpm, accuracy);
+
                 // Calculate percentile and badge
                 const newUserIndex = lb.findIndex((item: any) => item.isUser);
                 const rank = newUserIndex + 1;
@@ -3144,6 +3183,78 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   };
 
+  // Helper: Rank raw leaderboard rows, mark the user, and merge their local PB row.
+  const rankWeeklyLeaderboard = (rows: any[], weekId: string): any[] => {
+    const key = (s: string) => String(s || '').trim().toLowerCase();
+    const currentName = String(username || 'You').trim();
+    let next = rows.map((r: any) => ({
+      name: r.name,
+      wpm: Number(r.wpm) || 0,
+      accuracy: Number(r.accuracy) || 0,
+      isUser: key(r.name) === key(currentName),
+    }));
+    const pb = loadWeeklyPB(weekId);
+    const hasUser = next.some((r: any) => r.isUser);
+    if (!hasUser) {
+      next.push({
+        name: currentName,
+        wpm: pb ? pb.wpm : 0,
+        accuracy: pb ? pb.accuracy : 0,
+        isUser: true,
+      });
+    } else if (pb) {
+      next = next.map((r: any) =>
+        r.isUser ? { ...r, wpm: Math.max(r.wpm, pb.wpm), accuracy: Math.max(r.accuracy, pb.accuracy) } : r
+      );
+    }
+    next.sort((a: any, b: any) => b.wpm - a.wpm || b.accuracy - a.accuracy);
+    return next.slice(0, 10);
+  };
+
+  // Helper: Show a board (marking the user) in the leaderboard UI.
+  const showWeeklyLeaderboard = (weekId: string, rows: any[]) => {
+    setWeeklyLeaderboard(rankWeeklyLeaderboard(rows, weekId));
+  };
+
+  // Helper: Fetch the shared leaderboard from the server; fall back to the local seeded board.
+  const refreshRemoteLeaderboard = async (weekId: string) => {
+    try {
+      const res = await fetch(`/api/leaderboard?weekId=${encodeURIComponent(weekId)}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.entries)) {
+          showWeeklyLeaderboard(weekId, data.entries);
+          return;
+        }
+      }
+    } catch (e) {
+      // offline — fall through to the local board
+    }
+    showWeeklyLeaderboard(weekId, getLeaderboardForWeek(weekId));
+  };
+
+  // Helper: Submit a weekly score to the shared server (best-effort, never blocks).
+  const submitWeeklyScoreToServer = (weekId: string, wpm: number, accuracy: number) => {
+    try {
+      fetch("/api/leaderboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: username || 'You', wpm, accuracy, weekId }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data: any) => {
+          if (data && Array.isArray(data.entries)) {
+            showWeeklyLeaderboard(weekId, data.entries);
+          }
+        })
+        .catch(() => { /* offline — local board already updated */ });
+    } catch (e) {
+      // ignore
+    }
+  };
+
   // Function to open the Weekly Challenge modal/slideout and fetch story
   const openWeeklyChallenge = async () => {
     setWeeklyChallengeOpen(true);
@@ -3199,6 +3310,9 @@ export default function App() {
     localStorage.setItem(`ribbon_weekly_leaderboard_${weekId}`, JSON.stringify(lb));
     setWeeklyLeaderboard(lb);
     setWeeklyChallengeLoading(false);
+
+    // Try to surface the shared (server-backed) leaderboard for this week.
+    refreshRemoteLeaderboard(weekId);
   };
 
   // Function to start playing the Weekly Challenge
@@ -6036,6 +6150,35 @@ export default function App() {
                           );
                         })}
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Practice reminder email capture */}
+                  <div className="space-y-3 text-left">
+                    <span className="text-[10px] font-mono text-amber-400 uppercase tracking-wider block font-extrabold flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-amber-400" /> Practice Reminder
+                    </span>
+                    <div className="bg-[#121422]/90 p-4 rounded-2xl border border-zinc-800/80 shadow-md">
+                      <p className="text-[11px] text-zinc-300 font-mono mb-3">Get a nudge when this week's challenge drops and keep your streak alive.</p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="email"
+                          value={reminderEmail}
+                          onChange={(e) => setReminderEmail(e.target.value)}
+                          placeholder="you@example.com"
+                          className="flex-1 bg-[#0B0C10] border border-zinc-800 focus:border-amber-400/60 rounded-xl px-3.5 py-2.5 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none transition-colors"
+                        />
+                        <button
+                          onClick={saveReminderEmail}
+                          disabled={reminderSaving}
+                          className="bg-amber-400 hover:bg-amber-400/90 disabled:opacity-50 text-zinc-950 font-black font-mono text-[11px] px-4 py-2.5 rounded-xl transition-all cursor-pointer uppercase tracking-wider shadow-lg shadow-[#F59E0B]/20"
+                        >
+                          {reminderSaving ? 'Saving…' : 'Enable'}
+                        </button>
+                      </div>
+                      {reminderEmail && (
+                        <p className="text-[9px] font-mono text-emerald-400/90 mt-2">Email on file: {reminderEmail}</p>
+                      )}
                     </div>
                   </div>
 

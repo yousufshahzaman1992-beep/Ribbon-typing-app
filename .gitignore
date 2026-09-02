@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+leaderboard-data.json
+reminders-data.json

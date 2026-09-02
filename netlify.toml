@@ -1,15 +1,35 @@
 [build]
-  publish = "dist"
   command = "npm run build"
+  publish = "dist"
 
-[build.environment]
-  NODE_VERSION = "20"
+# Rewrite /api/* routes to serverless functions (preserving HTTP method).
+[[redirects]]
+  from = "/api/leaderboard"
+  to = "/.netlify/functions/leaderboard"
+  status = 200
+  force = true
 
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
+  from = "/api/reminders"
+  to = "/.netlify/functions/reminders"
   status = 200
+  force = true
 
+[[redirects]]
+  from = "/api/og-card"
+  to = "/.netlify/functions/og-card"
+  status = 200
+  force = true
+
+# Challenge share URLs get server-rendered social meta tags for rich previews.
+[[redirects]]
+  from = "/*"
+  query = { challenge = ":challenge" }
+  to = "/.netlify/functions/challenge-meta"
+  status = 200
+  force = true
+
+# SPA fallback so client-side routing keeps working.
 [[redirects]]
   from = "/*"
   to = "/index.html"
