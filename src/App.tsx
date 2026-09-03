@@ -57,6 +57,7 @@ import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { OnboardingModal } from './components/OnboardingModal';
 import { RightSidebarWidgets } from './components/RightSidebarWidgets';
 import { ToastNotification, ToastItem } from './components/ToastNotification';
+import { SeoContent } from './components/SeoContent';
 
 import { LESSONS } from './data';
 import { STORIES_LIT1 } from './stories_lit1';
@@ -4896,6 +4897,9 @@ export default function App() {
           )}
 
         </div>
+
+        {/* Indexable landing copy for search engines (visible band + off-screen long-form) */}
+        <SeoContent />
 
       </main>
 
