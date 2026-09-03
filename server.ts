@@ -8,6 +8,7 @@ import { generateStory, generateText, getLLMProviderStatus } from "./src/lib/llm
 import {
   insertScore,
   toLeaderboardResponse,
+  seedLeaderboard,
   LeaderboardEntry,
   LeaderboardResponse,
 } from "./src/lib/leaderboard";
@@ -300,6 +301,23 @@ function readLeaderboard(): LeaderboardEntry[] {
   return [];
 }
 
+// Seed the shared leaderboard with sample competitors only on the very first run
+// (no store file yet). Existing stores are never modified, so future weeks start
+// honest and empty until real typists submit scores.
+function ensureLeaderboardSeeded(weekId: string): LeaderboardEntry[] {
+  try {
+    const file = leaderboardFile();
+    if (!fs.existsSync(file)) {
+      const seeds = seedLeaderboard(weekId);
+      writeLeaderboard(seeds);
+      return seeds;
+    }
+  } catch (e) {
+    console.error("[Leaderboard] Failed to seed store:", e);
+  }
+  return readLeaderboard();
+}
+
 function writeLeaderboard(entries: LeaderboardEntry[]) {
   try {
     fs.writeFileSync(leaderboardFile(), JSON.stringify(entries), "utf8");
@@ -313,7 +331,8 @@ app.get("/api/leaderboard", (req, res) => {
   if (!weekId) {
     return res.status(400).json({ error: "weekId is required" });
   }
-  const response: LeaderboardResponse = toLeaderboardResponse(readLeaderboard(), weekId, 10);
+  const entries = ensureLeaderboardSeeded(weekId);
+  const response: LeaderboardResponse = toLeaderboardResponse(entries, weekId, 10);
   res.set("Cache-Control", "no-store");
   res.json(response);
 });
@@ -330,9 +349,10 @@ app.post("/api/leaderboard", (req, res) => {
     weekId,
     timestamp: Date.now(),
   };
-  const entries = insertScore(readLeaderboard(), score, LEADERBOARD_LIMIT);
-  writeLeaderboard(entries);
-  const response: LeaderboardResponse = toLeaderboardResponse(entries, weekId, 10);
+  const entries = ensureLeaderboardSeeded(weekId);
+  const next = insertScore(entries, score, LEADERBOARD_LIMIT);
+  writeLeaderboard(next);
+  const response: LeaderboardResponse = toLeaderboardResponse(next, weekId, 10);
   res.set("Cache-Control", "no-store");
   res.json(response);
 });

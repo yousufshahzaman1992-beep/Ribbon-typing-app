@@ -8,6 +8,7 @@ import {
   topScores,
   toLeaderboardResponse,
   sortEntries,
+  seedLeaderboard,
 } from '../src/lib/leaderboard.ts';
 
 const entry = (name, wpm, accuracy, weekId = '2026-08-31', timestamp = 0) => ({
@@ -79,4 +80,13 @@ test('toLeaderboardResponse returns entries, total per week', () => {
   ];
   const res = toLeaderboardResponse(entries, 'w1', 1);
   assert.deepEqual(res, { weekId: 'w1', entries: [{ name: 'b', wpm: 90, accuracy: 90 }], total: 2 });
+});
+
+test('seedLeaderboard produces believable, week-scoped, sorted rows', () => {
+  const seeds = seedLeaderboard('2026-09-07');
+  assert.equal(seeds.length, 12);
+  assert.ok(seeds.every((e) => e.weekId === '2026-09-07'));
+  assert.ok(seeds.every((e) => e.name && e.wpm > 0 && e.wpm <= 120 && e.accuracy >= 0 && e.accuracy <= 100));
+  assert.ok(seeds.every((e, i) => i === 0 || seeds[i - 1].wpm >= e.wpm));
+  assert.equal(filterByWeek(seeds, '2026-09-14').length, 0);
 });

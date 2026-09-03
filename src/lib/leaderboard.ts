@@ -73,3 +73,31 @@ export const toLeaderboardResponse = (
   const weekEntries = filterByWeek(entries, weekId);
   return { weekId, entries: topScores(weekEntries, limit), total: weekEntries.length };
 };
+
+// Sample competitor rows used only to seed a brand-new shared leaderboard so it
+// does not look empty before real typists submit scores. They are scoped to the
+// week they were created for and disappear once that week ends.
+export const seedLeaderboard = (weekId: string): LeaderboardEntry[] => {
+  const now = Date.now();
+  const rows: Array<[string, number, number]> = [
+    ['Aarav', 96, 98],
+    ['Maya', 92, 99],
+    ['Zain', 88, 97],
+    ['Priya', 84, 98],
+    ['Leo', 79, 96],
+    ['Sofia', 74, 97],
+    ['Kabir', 68, 95],
+    ['Emma', 62, 96],
+    ['Arjun', 57, 94],
+    ['Neha', 51, 95],
+    ['Omar', 46, 93],
+    ['Ivy', 41, 92],
+  ];
+  return rows.map(([name, wpm, accuracy], i) => ({
+    name,
+    wpm,
+    accuracy,
+    weekId,
+    timestamp: now - i * 60 * 60 * 1000,
+  }));
+};
