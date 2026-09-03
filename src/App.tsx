@@ -66,7 +66,9 @@ import { generateStory, generateText } from './lib/llmProvider';
 import { buildChallengeUrl, parseChallengeQuery, type ChallengeData } from './lib/challenge';
 
 // Code-split the arcade hub so the mini-games load only when opened
-const ArcadeHub = lazy(() => import('./components/ArcadeHub'));
+const ArcadeHub = lazy(() =>
+  import('./components/ArcadeHub').then((m) => ({ default: m.ArcadeHub }))
+);
 
 // Web Audio API Sound Synthesizer for tactile mechanical clacks
 class MechanicalFeedback {
