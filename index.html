@@ -52,9 +52,78 @@
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
     }
     </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How is typing speed (WPM) measured?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Your WPM is calculated from the characters you type correctly each minute. A standard word is five characters, so a 60-second test with 300 correct characters equals 60 WPM. Accuracy is the share of keystrokes you get right and counts toward your score alongside speed." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is the typing speed test free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. The 60-second WPM test, every practice lesson, the weekly challenge, and all arcade mini-games are completely free with no account required. Progress is saved locally and the app works offline as an installable PWA." }
+        },
+        {
+          "@type": "Question",
+          "name": "What typing content can I practice?",
+          "acceptedAnswer": { "@type": "Answer", "text": "English and Hindi (Devanagari) practice, JavaScript code typing with automatic bracket handling, medical and complex terminology drills, custom stories and pasted text, plus timed story races, zen freestyle, and strict exam mode with backspace disabled." }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I improve my words per minute?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Practice daily, focus on accuracy before speed, use the on-screen hand guide to build correct finger placement, and retake short timed tests. The app tracks streaks, XP, and level so you can see steady improvement, and the weekly challenge lets you compare your WPM against other typists on the global leaderboard." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I compare my typing speed with others?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Finish a session to open the shared weekly leaderboard, where your best score for the current week is stored under your chosen name. You can also generate a challenge link and share it so friends can race the same passage and try to beat your WPM." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Ribbon Typing Coach work on my phone?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Ribbon is fully responsive with an on-screen keyboard for tablets and touch devices, and it can be installed as a progressive web app so it runs offline in fullscreen like a native app." }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="shell-seo">
+        <h1>Free Typing Speed Test (WPM) — English, Hindi &amp; Code Practice</h1>
+        <p>Take a free 60-second typing speed test and get your words per minute (WPM) and accuracy instantly. Ribbon Typing Coach is a free online typing tester and typing practice app with structured English lessons, Hindi (Devanagari) typing practice, JavaScript code typing with auto-bracket completion, medical terminology drills, and custom stories you paste yourself. Every run is scored for speed and accuracy, earns XP, and keeps your daily practice streak alive.</p>
+        <p>Beyond the timed test, practice with race mode against AI opponents, zen freestyle, strict exam mode with backspace disabled, arcade mini-games, and a weekly challenge that posts your best score to a shared global leaderboard. Share a challenge link with friends so they can race the same passage and try to beat your WPM. No sign-up required; progress is saved locally and the app works offline as an installable PWA.</p>
+        <h2>How the typing test works</h2>
+        <ol>
+          <li>Pick a lesson, duration (60 seconds by default), and language — English or Hindi.</li>
+          <li>Type the highlighted text. Errors and fumbled keys are tracked in real time.</li>
+          <li>See your WPM, accuracy, and benchmark rating at the end, then open the leaderboard or challenge a friend.</li>
+        </ol>
+        <h2>What you can practice</h2>
+        <ul>
+          <li>60-second WPM speed test with live accuracy</li>
+          <li>English and Hindi typing practice lessons</li>
+          <li>Code typing practice in JavaScript syntax</li>
+          <li>Medical and complex word drills</li>
+          <li>Custom stories and pasted text</li>
+          <li>Weekly challenge with a global leaderboard</li>
+          <li>Friend challenges via shareable links</li>
+          <li>Streaks, XP, and level progression</li>
+        </ul>
+        <h2>Frequently asked questions</h2>
+        <p><strong>How is typing speed (WPM) measured?</strong><br />Your WPM is calculated from the characters you type correctly each minute. A standard word is five characters, so a 60-second test with 300 correct characters equals 60 WPM. Accuracy is the share of keystrokes you get right and counts toward your score alongside speed.</p>
+        <p><strong>Is the typing speed test free?</strong><br />Yes. The 60-second WPM test, every practice lesson, the weekly challenge, and all arcade mini-games are completely free with no account required. Progress is saved locally and the app works offline as an installable PWA.</p>
+        <p><strong>What typing content can I practice?</strong><br />English and Hindi (Devanagari) practice, JavaScript code typing with automatic bracket handling, medical and complex terminology drills, custom stories and pasted text, plus timed story races, zen freestyle, and strict exam mode with backspace disabled.</p>
+        <p><strong>How do I improve my words per minute?</strong><br />Practice daily, focus on accuracy before speed, use the on-screen hand guide to build correct finger placement, and retake short timed tests. The app tracks streaks, XP, and level so you can see steady improvement, and the weekly challenge lets you compare your WPM against other typists on the global leaderboard.</p>
+        <p><strong>Can I compare my typing speed with others?</strong><br />Yes. Finish a session to open the shared weekly leaderboard, where your best score for the current week is stored under your chosen name. You can also generate a challenge link and share it so friends can race the same passage and try to beat your WPM.</p>
+        <p><strong>Does Ribbon Typing Coach work on my phone?</strong><br />Yes. Ribbon is fully responsive with an on-screen keyboard for tablets and touch devices, and it can be installed as a progressive web app so it runs offline in fullscreen like a native app.</p>
+        <small>Ribbon Typing Coach is a free typing practice app for improving your words-per-minute speed and accuracy. It is not affiliated with any typing certification body. <a href="/privacy.html" rel="nofollow">Privacy Policy</a></small>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
