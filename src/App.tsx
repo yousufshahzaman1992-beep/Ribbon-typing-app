@@ -50,8 +50,7 @@ import {
   Ghost,
   Share2,
   Shuffle,
-  Brain,
-  Mail
+  Brain
 } from 'lucide-react';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { OnboardingModal } from './components/OnboardingModal';
@@ -1170,41 +1169,6 @@ export default function App() {
     }
     return false;
   });
-
-  // Practice reminder email capture (settings)
-  const [reminderEmail, setReminderEmail] = useState<string>(() => {
-    if (typeof localStorage !== "undefined") {
-      return localStorage.getItem("ribbon_email") || "";
-    }
-    return "";
-  });
-  const [reminderSaving, setReminderSaving] = useState<boolean>(false);
-
-  const saveReminderEmail = async () => {
-    const clean = reminderEmail.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
-      addToast('Invalid email', 'Please enter a valid email address to enable reminders.', 'info');
-      return;
-    }
-    localStorage.setItem("ribbon_email", clean);
-    setReminderSaving(true);
-    try {
-      const res = await fetch("/api/reminders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: clean }),
-      });
-      if (res.ok) {
-        addToast('Reminder enabled!', 'We will nudge you to practice when a new weekly challenge drops.', 'info');
-      } else {
-        addToast('Saved on device', 'Email stored locally; sync available once online services connect.', 'info');
-      }
-    } catch (e) {
-      addToast('Saved on device', 'Email stored locally; sync available once online services connect.', 'info');
-    } finally {
-      setReminderSaving(false);
-    }
-  };
 
   // Bot Race & Boss Battle state
   const [botRaceActive, setBotRaceActive] = useState<boolean>(false);
@@ -4898,7 +4862,7 @@ export default function App() {
 
         </div>
 
-        {/* Indexable landing copy for search engines (visible band + off-screen long-form) */}
+        {/* Indexable landing copy for search engines (compact footer card; long-form copy embedded statically in index.html) */}
         <SeoContent />
 
       </main>
@@ -6156,35 +6120,6 @@ export default function App() {
                           );
                         })}
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Practice reminder email capture */}
-                  <div className="space-y-3 text-left">
-                    <span className="text-[10px] font-mono text-amber-400 uppercase tracking-wider block font-extrabold flex items-center gap-1.5">
-                      <Mail className="w-3.5 h-3.5 text-amber-400" /> Practice Reminder
-                    </span>
-                    <div className="bg-[#121422]/90 p-4 rounded-2xl border border-zinc-800/80 shadow-md">
-                      <p className="text-[11px] text-zinc-300 font-mono mb-3">Get a nudge when this week's challenge drops and keep your streak alive.</p>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <input
-                          type="email"
-                          value={reminderEmail}
-                          onChange={(e) => setReminderEmail(e.target.value)}
-                          placeholder="you@example.com"
-                          className="flex-1 bg-[#0B0C10] border border-zinc-800 focus:border-amber-400/60 rounded-xl px-3.5 py-2.5 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none transition-colors"
-                        />
-                        <button
-                          onClick={saveReminderEmail}
-                          disabled={reminderSaving}
-                          className="bg-amber-400 hover:bg-amber-400/90 disabled:opacity-50 text-zinc-950 font-black font-mono text-[11px] px-4 py-2.5 rounded-xl transition-all cursor-pointer uppercase tracking-wider shadow-lg shadow-[#F59E0B]/20"
-                        >
-                          {reminderSaving ? 'Saving…' : 'Enable'}
-                        </button>
-                      </div>
-                      {reminderEmail && (
-                        <p className="text-[9px] font-mono text-emerald-400/90 mt-2">Email on file: {reminderEmail}</p>
-                      )}
                     </div>
                   </div>
 
