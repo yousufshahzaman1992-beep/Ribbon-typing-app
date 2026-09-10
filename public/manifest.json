@@ -2,7 +2,7 @@
   "name": "Ribbon Typing Coach",
   "short_name": "Ribbon",
   "description": "Free typing speed test and practice coach. Test your WPM and accuracy, then challenge friends to beat your score.",
-  "start_url": "/",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0B0C10",

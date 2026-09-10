@@ -60,7 +60,7 @@ export const ArcadeHub: React.FC<Props> = ({ sfx, onClose }) => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 relative overflow-y-auto overflow-x-hidden scrollbar-none">
         {game === 'menu' && <ArcadeMenu onSelect={startGame} sfx={sfx} />}
         {game === 'invaders' && <InvadersGame sfx={sfx} score={score} setScore={setScore} gameOver={gameOver} setGameOver={setGameOver} onBack={backToMenu} />}
         {game === 'wordsprint' && <WordSprintGame sfx={sfx} score={score} setScore={setScore} gameOver={gameOver} setGameOver={setGameOver} onBack={backToMenu} />}
@@ -80,9 +80,9 @@ const GAME_CARDS = [
 ];
 
 const ArcadeMenu: React.FC<{ onSelect: (g: Game) => void; sfx: any }> = ({ onSelect, sfx }) => (
-  <div className="h-full flex flex-col items-center justify-center p-6 gap-4">
+  <div className="min-h-full w-full flex flex-col items-center justify-center px-4 py-6 gap-4">
     <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest mb-2">Choose your game</p>
-    <div className="grid grid-cols-2 gap-4 w-full max-w-lg">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full max-w-lg">
       {GAME_CARDS.map(g => (
         <button
           key={g.id}
@@ -211,9 +211,9 @@ const InvadersGame: React.FC<GameProps> = ({ sfx, score, setScore, gameOver, set
   const waveLabels = ['🟢 Wave 1 – Beginner','🔵 Wave 2 – Easy','🟡 Wave 3 – Medium','🟠 Wave 4 – Hard','🔴 Wave 5 – Insane'];
 
   return (
-    <div className="h-full flex flex-col p-3 gap-2">
+    <div className="min-h-full flex flex-col p-3 gap-2">
       {gameOver && <GameOverScreen score={score} onRestart={restart} onMenu={onBack} />}
-      <div className="flex items-center justify-between text-[10px] font-mono shrink-0">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[10px] font-mono shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-zinc-500">SHIELD:</span>
           <div className="w-28 h-2 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-red-500 to-[#FFB800] transition-all" style={{ width: `${shield}%` }} /></div>
@@ -307,14 +307,14 @@ const WordSprintGame: React.FC<GameProps> = ({ sfx, score, setScore, gameOver, s
   const timerColor = timeLeft <= 5 ? 'text-red-400' : timeLeft <= 10 ? 'text-[#FFB800]' : 'text-[#00F0FF]';
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-6 gap-6">
+    <div className="min-h-full flex flex-col items-center justify-center p-5 sm:p-6 gap-5 sm:gap-6">
       {gameOver && <GameOverScreen score={score} onRestart={restart} onMenu={onBack} />}
       <div className="flex items-center gap-6 text-center">
         <div><p className="text-zinc-500 font-mono text-[9px] uppercase">Time</p><p className={`font-black font-mono text-3xl ${timerColor}`}>{timeLeft}s</p></div>
         <div><p className="text-zinc-500 font-mono text-[9px] uppercase">Streak</p><p className="font-black font-mono text-3xl text-[#FFB800]">×{streak}</p></div>
         <div><p className="text-zinc-500 font-mono text-[9px] uppercase">Level</p><p className={`font-black font-mono text-sm ${levelColors[level]}`}>{level}</p></div>
       </div>
-      <div className="bg-[#141419] border border-zinc-700 rounded-2xl px-10 py-6 text-center min-w-[280px]">
+      <div className="bg-[#141419] border border-zinc-700 rounded-2xl px-6 sm:px-10 py-6 text-center w-full max-w-[280px]">
         <p className="text-4xl font-black font-mono text-white tracking-widest">{currentWord}</p>
       </div>
       <input
@@ -324,7 +324,7 @@ const WordSprintGame: React.FC<GameProps> = ({ sfx, score, setScore, gameOver, s
         onChange={handleInput}
         disabled={gameOver}
         placeholder={started ? '' : 'Start typing…'}
-        className="bg-[#0B0C10] border-2 border-zinc-700 focus:border-[#00F0FF] text-white font-mono text-lg px-4 py-2 rounded-xl outline-none w-64 text-center transition-all"
+        className="bg-[#0B0C10] border-2 border-zinc-700 focus:border-[#00F0FF] text-white font-mono text-lg px-4 py-2 rounded-xl outline-none w-64 max-w-full text-center transition-all"
       />
       <p className="text-zinc-600 font-mono text-[10px] text-center">Words get harder as your streak grows · Streak multiplies points</p>
     </div>
@@ -439,21 +439,21 @@ const WhackKeyGame: React.FC<GameProps> = ({ sfx, score, setScore, gameOver, set
   const timerColor = timeLeft <= 5 ? 'text-red-400' : 'text-[#00F0FF]';
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-4 gap-4">
+    <div className="min-h-full flex flex-col items-center justify-center p-4 sm:p-5 gap-4">
       {gameOver && <GameOverScreen score={score} onRestart={restart} onMenu={onBack} />}
       <div className="flex items-center gap-4">
         <p className={`font-black font-mono text-2xl ${timerColor}`}>{timeLeft}s</p>
         <span className={`font-black font-mono text-xs ${diff.color}`}>{diff.label}</span>
         {!started && <p className="text-zinc-400 font-mono text-xs animate-pulse">Press any lit key to start</p>}
       </div>
-      <div className="flex flex-col items-center gap-1.5">
+      <div className="flex flex-col items-center gap-1.5 w-full">
         {KEYBOARD_ROWS.map((row, ri) => (
-          <div key={ri} className="flex gap-1.5">
+          <div key={ri} className="flex gap-1 justify-center w-full max-w-md">
             {row.map((k) => {
               const active = keys.find(kk => kk.key === k);
               const progress = active ? Math.max(0, (active.deadline - Date.now()) / 2000) : 1;
               return (
-                <div key={k} className={`w-10 h-10 flex items-center justify-center rounded-lg font-mono font-black text-sm border-2 transition-all duration-150 ${active ? 'border-[#FFB800] bg-[#FFB800]/20 text-[#FFB800] shadow-[0_0_15px_rgba(255,184,0,0.4)] scale-110 animate-pulse' : 'border-zinc-800 bg-zinc-900/60 text-zinc-600'}`}>
+                <div key={k} className={`relative flex-1 min-w-0 max-w-[46px] h-10 flex items-center justify-center rounded-lg font-mono font-black text-sm border-2 transition-all duration-150 ${active ? 'border-[#FFB800] bg-[#FFB800]/20 text-[#FFB800] shadow-[0_0_15px_rgba(255,184,0,0.4)] scale-110 animate-pulse' : 'border-zinc-800 bg-zinc-900/60 text-zinc-600'}`}>
                   {k.toUpperCase()}
                   {active && <div className="absolute bottom-0 left-0 h-0.5 bg-[#FFB800] transition-all" style={{ width: `${progress * 100}%` }} />}
                 </div>
@@ -517,14 +517,14 @@ const ComboChainGame: React.FC<GameProps> = ({ sfx, score, setScore, gameOver, s
   const borderColor = flash === 'correct' ? 'border-[#45A29E] shadow-[0_0_20px_rgba(69,162,158,0.4)]' : flash === 'wrong' ? 'border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.4)]' : 'border-zinc-700';
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-6 gap-6">
+    <div className="min-h-full flex flex-col items-center justify-center p-5 sm:p-6 gap-5 sm:gap-6">
       {gameOver && <GameOverScreen score={score} onRestart={restart} onMenu={onBack} />}
       <div className="flex items-center gap-6">
         <div className="text-center"><p className="text-zinc-500 font-mono text-[9px] uppercase">Combo</p><p className="text-[#FFB800] font-black font-mono text-3xl">×{combo}</p></div>
         <div className="text-center"><p className="text-zinc-500 font-mono text-[9px] uppercase">Score</p><p className="text-[#00F0FF] font-black font-mono text-3xl">{score}</p></div>
       </div>
-      <div className={`border-2 ${borderColor} bg-[#141419] rounded-2xl px-8 py-5 transition-all duration-150`}>
-        <div className="flex gap-2 items-center">
+      <div className={`border-2 ${borderColor} bg-[#141419] rounded-2xl px-4 sm:px-8 py-5 transition-all duration-150 max-w-full`}>
+        <div className="flex gap-1.5 sm:gap-2 items-center justify-center flex-wrap max-w-full">
           {sequence.split('').map((ch, i) => (
             <span key={i} className={`font-black font-mono text-2xl w-8 h-10 flex items-center justify-center rounded-lg ${i < typed.length ? 'bg-[#45A29E]/30 text-[#45A29E]' : i === typed.length ? 'bg-[#00F0FF]/10 text-[#00F0FF] border border-[#00F0FF]/50 animate-pulse' : 'text-zinc-500'}`}>
               {ch.toUpperCase()}

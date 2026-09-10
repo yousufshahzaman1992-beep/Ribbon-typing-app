@@ -56,7 +56,6 @@ import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { OnboardingModal } from './components/OnboardingModal';
 import { RightSidebarWidgets } from './components/RightSidebarWidgets';
 import { ToastNotification, ToastItem } from './components/ToastNotification';
-import { SeoContent } from './components/SeoContent';
 
 import { LESSONS } from './data';
 import { STORIES_LIT1 } from './stories_lit1';
@@ -446,9 +445,16 @@ export default function App() {
     return [];
   });
 
+  // Deep-link landing CTA (?start=...) — which session to boot straight into
+  const bootStart = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('start')
+    : null;
+
   // Redesign: XP, Level & Toast Notification State
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(() => {
     if (typeof localStorage !== 'undefined') {
+      const hasDeepLink = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('start');
+      if (hasDeepLink) return false;
       return localStorage.getItem('ribbon_onboarding_done') !== 'true';
     }
     return false;
@@ -890,6 +896,97 @@ export default function App() {
       // Clean the URL so the banner doesn't re-parse on refresh
       window.history.replaceState({}, '', window.location.pathname);
     }
+  }, []);
+
+  // Deep-link landing CTA (?start=...) — boot straight into the matching session
+  useEffect(() => {
+    if (!bootStart) return;
+    const stopPlayfulModes = () => {
+      setBotRaceActive(false);
+      setAdaptiveBossActive(false);
+      setFreestyleMode(false);
+      setZenMode(false);
+      setArcadeActive(false);
+      setExamMode(false);
+    };
+    switch (bootStart) {
+      case 'test':
+        setActiveModal(null);
+        stopPlayfulModes();
+        setActiveAppMode('normal');
+        setTestDuration(60);
+        selectStoryForDuration(60);
+        handleResetSession();
+        break;
+      case 'beginner':
+        setActiveModal(null);
+        stopPlayfulModes();
+        setActiveAppMode('normal');
+        if (currentScript !== 'english') {
+          setCurrentScript('english');
+        } else {
+          const homeLesson = LESSONS.find(l => l.id === 0) || LESSONS[0];
+          if (homeLesson) loadLesson(homeLesson);
+        }
+        handleResetSession();
+        break;
+      case 'hindi':
+        setActiveModal(null);
+        stopPlayfulModes();
+        setActiveAppMode('normal');
+        if (currentScript !== 'hindi') {
+          setCurrentScript('hindi');
+        } else {
+          const hindiHome = LESSONS.find(l => l.category === "Touch Typing Basics (Hindi)") || LESSONS.find(l => l.id === 500);
+          if (hindiHome) loadLesson(hindiHome);
+        }
+        handleResetSession();
+        break;
+      case 'code':
+        handleModeChange('code');
+        break;
+      case 'medical':
+        handleModeChange('medical');
+        break;
+      case 'passages':
+        stopPlayfulModes();
+        setActiveModal('practice');
+        break;
+      case 'race':
+        setActiveModal(null);
+        stopPlayfulModes();
+        setBotRaceActive(true);
+        handleResetSession();
+        break;
+      case 'boss':
+        setActiveModal(null);
+        stopPlayfulModes();
+        setAdaptiveBossActive(true);
+        handleResetSession();
+        break;
+      case 'arcade':
+        setActiveModal(null);
+        stopPlayfulModes();
+        setArcadeActive(true);
+        setArcadeScore(0);
+        setArcadeShield(100);
+        setFallingLetters([]);
+        break;
+      case 'zen':
+        setActiveModal(null);
+        stopPlayfulModes();
+        setFreestyleMode(true);
+        setZenMode(true);
+        handleResetSession();
+        break;
+      case 'weekly':
+        openWeeklyChallenge();
+        break;
+      case 'leaderboard':
+        handleOpenLeaderboard();
+        break;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleFullscreen = () => {
@@ -4015,6 +4112,17 @@ export default function App() {
 
                 <div className="h-4 w-px bg-zinc-800 hidden sm:block" />
 
+                {/* Compact guide teaser — links back to the landing page */}
+                <a
+                  href="/"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-mono text-zinc-400 hover:text-amber-400 px-2.5 py-1 rounded-xl border border-zinc-800 hover:border-amber-500/40 hover:bg-amber-500/10 transition-all select-none"
+                  title="New to Ribbon? See the full typing guide, features and FAQ"
+                >
+                  <span className="text-amber-400 font-bold">Guide</span>
+                  <span className="text-zinc-500">→</span>
+                </a>
+
+
                 {/* 3-COLOR SYSTEM STATS BAR (hidden on small screens; LIVE/ACC shown in story row below) */}
                 <div className="hidden lg:flex items-center gap-2.5 text-xs font-mono select-none">
                   {/* Accuracy: Green Success Color */}
@@ -4496,7 +4604,7 @@ export default function App() {
             )}
 
             {/* Typing Text Area – taking up the remaining height */}
-            <div className="flex-1 w-full flex flex-col justify-start items-center relative bg-[#0B0C10]/40 border border-zinc-800/60 rounded-[20px] p-4 xl:p-5 mb-2 min-h-[280px] max-h-[50vh] lg:max-h-none shadow-[inset_0_0_40px_rgba(0,0,0,0.3)] overflow-visible">
+            <div className={`flex-1 w-full flex flex-col justify-start items-center relative bg-[#0B0C10]/40 border border-zinc-800/60 rounded-[20px] p-4 xl:p-5 mb-2 ${arcadeActive ? 'min-h-[500px] xl:min-h-[300px] max-h-none' : 'min-h-[280px] max-h-[50vh] lg:max-h-none'} shadow-[inset_0_0_40px_rgba(0,0,0,0.3)] overflow-visible`}>
 
               {/* Pause Screen Overlay */}
               {isPaused && !workoutCompleted && !arcadeActive && (
@@ -4750,7 +4858,7 @@ export default function App() {
             </div>
 
             {/* Tablet on-screen keyboard (hidden on large desktops that use physical keys) */}
-            {keyboardVisibleOnMobile && (
+            {keyboardVisibleOnMobile && !arcadeActive && (
               <div className="xl:hidden w-full shrink-0 flex flex-col items-center gap-2 pt-1 pb-2">
                 <div className="w-full flex items-center justify-between select-none font-mono" style={{ fontSize: '11px' }}>
                   <button
@@ -4861,9 +4969,6 @@ export default function App() {
           )}
 
         </div>
-
-        {/* Indexable landing copy for search engines (compact footer card; long-form copy embedded statically in index.html) */}
-        <SeoContent />
 
       </main>
 

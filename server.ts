@@ -24,6 +24,110 @@ const PORT = 3000;
 app.use(express.json());
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Landing page / coach app routing helpers
+// The static landing page (full long-tail SEO copy) lives at "/". The React
+// typing coach hydrates only on "/app". Legacy "beat my score" challenge links
+// pointed at "/?challenge=...", so keep forwarding those to the new coach URL.
+// ─────────────────────────────────────────────────────────────────────────────
+const SITE_BASE = "https://ribbon-typing-app.netlify.app";
+
+function setHeadMeta(html: string, overrides: Record<string, string | boolean>) {
+  if (typeof overrides.title === "string") {
+    html = html.replace(/<title>[^<]*<\/title>/, `<title>${overrides.title}</title>`);
+  }
+  if (typeof overrides.description === "string") {
+    html = html.replace(
+      /<meta name="description" content="[^"]*" \/>/,
+      `<meta name="description" content="${overrides.description}" />`,
+    );
+  }
+  if (typeof overrides.canonical === "string") {
+    html = html.replace(
+      /<link rel="canonical" href="[^"]*" \/>/,
+      `<link rel="canonical" href="${SITE_BASE}${overrides.canonical}" />`,
+    );
+  }
+  if (overrides.noindex === true) {
+    html = html.replace(
+      /<meta name="robots" content="index, follow" \/>/,
+      '<meta name="robots" content="noindex, follow" />',
+    );
+  }
+  const ogProps: Array<[string, string]> = [
+    ["og:title", "ogTitle"],
+    ["og:description", "ogDescription"],
+    ["og:url", "ogUrl"],
+  ];
+  for (const [prop, key] of ogProps) {
+    if (typeof overrides[key] === "string") {
+      const value = prop === "og:url" ? `${SITE_BASE}${overrides[key]}` : overrides[key] as string;
+      html = html.replace(
+        new RegExp(`<meta property="${prop}" content="[^"]*" \\/>`),
+        `<meta property="${prop}" content="${value}" />`,
+      );
+    }
+  }
+  const twitterProps: Array<[string, string]> = [
+    ["twitter:title", "ogTitle"],
+    ["twitter:description", "ogDescription"],
+  ];
+  for (const [prop, key] of twitterProps) {
+    if (typeof overrides[key] === "string") {
+      html = html.replace(
+        new RegExp(`<meta name="${prop}" content="[^"]*" \\/>`),
+        `<meta name="${prop}" content="${overrides[key] as string}" />`,
+      );
+    }
+  }
+  return html;
+}
+
+function renderAppShell(landingHtml: string): string {
+  // The coach hydrates into #root and React replaces the markup on first render.
+  // Head-level differences are what matter for SEO/social: unique short meta,
+  // canonical "/app", noindex (thin JS shell), and no duplicated structured data.
+  let html = landingHtml.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, "");
+  return setHeadMeta(html, {
+    title: "Typing Coach — Practice & Beat Your WPM | Ribbon",
+    description:
+      "Open the Ribbon typing coach: timed WPM and accuracy tests, English and Hindi lessons, JavaScript code practice, bot races, arcade games and the weekly leaderboard — all free and with no sign-up.",
+    canonical: "/app",
+    ogTitle: "Ribbon Typing Coach — Free WPM & Accuracy Practice",
+    ogDescription:
+      "Free timed WPM tests, English & Hindi lessons, JavaScript code practice, bot races, arcade games and a weekly leaderboard. No sign-up.",
+    ogUrl: "/app",
+    noindex: true,
+  });
+}
+
+function injectScoreCardMeta(html: string, parsed: { name: string; wpm: number; acc: number; minutes: number }, origin: string) {
+  const cardUrl = `${origin}/api/og-card?name=${encodeURIComponent(parsed.name)}&wpm=${parsed.wpm}&acc=${parsed.acc}&minutes=${parsed.minutes}`;
+  const title = `Can you beat ${parsed.name}'s ${parsed.wpm} WPM?`;
+  const description = `${parsed.name} scored ${parsed.wpm} WPM with ${parsed.acc}% accuracy on Ribbon Typing Coach. Take the ${parsed.minutes}-minute test and take the crown!`;
+  const meta = [
+    `<meta property="og:title" content="${title}" />`,
+    `<meta property="og:description" content="${description}" />`,
+    `<meta property="og:image" content="${cardUrl}" />`,
+    `<meta property="og:image:width" content="1200" />`,
+    `<meta property="og:image:height" content="630" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${title}" />`,
+    `<meta name="twitter:description" content="${description}" />`,
+    `<meta name="twitter:image" content="${cardUrl}" />`,
+  ].join("\n    ");
+  return html.replace("<head>", `<head>\n    ${meta}`);
+}
+
+// Legacy "beat my score" challenge links used to live at "/?challenge=..." — the
+// coach (and its challenge parser) now lives at "/app", so forward those.
+app.use((req, res, next) => {
+  if (req.path === "/" && req.query.challenge) {
+    return res.redirect(302, `/app?challenge=${encodeURIComponent(String(req.query.challenge))}`);
+  }
+  next();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 1. Generate Story based on Topic
 // ─────────────────────────────────────────────────────────────────────────────
 app.post("/api/generate-story", async (req, res) => {
@@ -426,43 +530,41 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
+    const indexFile = path.join(distPath, "index.html");
+    let landingHtml = "";
+    let appShellHtml = "";
+    try {
+      landingHtml = fs.readFileSync(indexFile, "utf8");
+      appShellHtml = renderAppShell(landingHtml);
+    } catch (e) {
+      console.error("[Server] Failed to read dist/index.html:", e);
+    }
 
-    // Dynamic social meta tags for shared "beat me" challenge links so
-    // crawlers (WhatsApp, Twitter/X, Facebook, Discord) render a scorecard.
+    // Static landing page with the full SEO copy ("/" is not hydrated by React)
     app.get("/", (req, res) => {
-      const indexFile = path.join(distPath, "index.html");
-      let html: string;
-      try {
-        html = fs.readFileSync(indexFile, "utf8");
-      } catch (e) {
-        return res.status(404).send("Not found");
-      }
+      if (!landingHtml) return res.status(404).send("Not found");
+      res.send(landingHtml);
+    });
 
+    // React typing coach shell (only hydrated client-side on /app)
+    app.get("/app", (req, res) => {
+      if (!appShellHtml) return res.status(404).send("Not found");
+      let html = appShellHtml;
       const parsed = parseChallengeQuery(req.query.challenge as string | null);
-      if (!parsed) return res.send(html);
-
-      const origin = `${req.protocol}://${req.get("host")}`;
-      const cardUrl = `${origin}/api/og-card?name=${encodeURIComponent(parsed.name)}&wpm=${parsed.wpm}&acc=${parsed.acc}&minutes=${parsed.minutes}`;
-      const title = `Can you beat ${parsed.name}'s ${parsed.wpm} WPM?`;
-      const description = `${parsed.name} scored ${parsed.wpm} WPM with ${parsed.acc}% accuracy on Ribbon Typing Coach. Take the ${parsed.minutes}-minute test and take the crown!`;
-      const meta = [
-        `<meta property="og:title" content="${title}" />`,
-        `<meta property="og:description" content="${description}" />`,
-        `<meta property="og:image" content="${cardUrl}" />`,
-        `<meta property="og:image:width" content="1200" />`,
-        `<meta property="og:image:height" content="630" />`,
-        `<meta name="twitter:card" content="summary_large_image" />`,
-        `<meta name="twitter:title" content="${title}" />`,
-        `<meta name="twitter:description" content="${description}" />`,
-        `<meta name="twitter:image" content="${cardUrl}" />`,
-      ].join("\n    ");
-      html = html.replace("<head>", `<head>\n    ${meta}`);
+      if (parsed) {
+        const origin = `${req.protocol}://${req.get("host")}`;
+        html = injectScoreCardMeta(html, parsed, origin);
+      }
       res.send(html);
     });
 
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+
+    // Anything that is not a real file or one of the known routes is a 404. The
+    // landing page is intentionally NOT served for arbitrary paths, so we don't
+    // create thousands of near-duplicate indexable URLs.
+    app.use((_req, res) => {
+      res.status(404).send("Not found");
     });
   }
 

@@ -1,15 +1,26 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Free Typing Speed Test (WPM) — English, Hindi &amp; Code Practice</title>
-    <meta name="description" content="Free 60-second typing speed test that measures your WPM and accuracy. Practice English, Hindi (Devanagari) and JavaScript code typing with lessons, races, weekly challenges, and friend challenges." />
-    <meta name="keywords" content="typing speed test, wpm test, typing test, free typing practice, typing coach, words per minute, typing accuracy, typing games, code typing practice, hindi typing practice, english typing practice, medical typing practice" />
+    <title>Free Typing Speed Test (WPM) &amp; Accuracy — 113 English, Hindi &amp; Code Lessons | Ribbon</title>
+    <meta name="description" content="Free typing speed test that measures your WPM and typing accuracy in real time. Typing practice for beginners with 113 lessons: English, Hindi (Devanagari), JavaScript code and medical drills. No sign-up needed." />
+    <meta name="keywords" content="free typing speed test, typing test wpm, typing test with accuracy, typing practice for beginners, typing practice with paragraphs, typing test with paragraphs, hindi typing lessons, hindi typing practice, javascript typing practice, code typing practice, medical typing practice, words per minute test, typing coach" />
     <meta name="robots" content="index, follow" />
     <meta name="theme-color" content="#0B0C10" />
     <link rel="canonical" href="https://ribbon-typing-app.netlify.app/" />
     <link rel="sitemap" href="/sitemap.xml" />
+
+    <!-- Two-column feature grids: let children shrink below their min-content
+         so wide blocks (e.g. the code sample) scroll instead of overflowing -->
+    <style>
+      .seo-layout > * { min-width: 0; }
+    </style>
+
+    <!-- Fonts (shared with the typing coach app) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
     <!-- Icons & PWA -->
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -23,8 +34,8 @@
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Ribbon Typing Coach" />
-    <meta property="og:title" content="Free Typing Speed Test (WPM) — English, Hindi & Code Practice" />
-    <meta property="og:description" content="Free 60-second typing speed test for WPM and accuracy, with English, Hindi and code typing practice plus weekly challenges." />
+    <meta property="og:title" content="Free Typing Speed Test (WPM) &amp; Accuracy — 113 English, Hindi &amp; Code Lessons" />
+    <meta property="og:description" content="Free typing speed test that measures WPM and accuracy in real time. Beginner typing practice with 113 lessons: English, Hindi (Devanagari), JavaScript code and medical drills. No sign-up." />
     <meta property="og:url" content="https://ribbon-typing-app.netlify.app/" />
     <meta property="og:image" content="https://ribbon-typing-app.netlify.app/og-image.png" />
     <meta property="og:image:type" content="image/png" />
@@ -34,8 +45,8 @@
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Free Typing Speed Test (WPM) — English, Hindi & Code Practice" />
-    <meta name="twitter:description" content="Free 60-second typing speed test for WPM and accuracy, with English, Hindi and code typing practice plus weekly challenges." />
+    <meta name="twitter:title" content="Free Typing Speed Test (WPM) &amp; Accuracy — 113 English, Hindi &amp; Code Lessons" />
+    <meta name="twitter:description" content="Free typing speed test that measures WPM and accuracy in real time. Beginner typing practice with 113 lessons: English, Hindi (Devanagari), JavaScript code and medical drills." />
     <meta name="twitter:image" content="https://ribbon-typing-app.netlify.app/og-image.png" />
 
     <!-- Structured data -->
@@ -93,35 +104,388 @@
   </head>
   <body>
     <div id="root">
-      <div id="shell-seo">
-        <h1>Free Typing Speed Test (WPM) — English, Hindi &amp; Code Practice</h1>
-        <p>Take a free 60-second typing speed test and get your words per minute (WPM) and accuracy instantly. Ribbon Typing Coach is a free online typing tester and typing practice app with structured English lessons, Hindi (Devanagari) typing practice, JavaScript code typing with auto-bracket completion, medical terminology drills, and custom stories you paste yourself. Every run is scored for speed and accuracy, earns XP, and keeps your daily practice streak alive.</p>
-        <p>Beyond the timed test, practice with race mode against AI opponents, zen freestyle, strict exam mode with backspace disabled, arcade mini-games, and a weekly challenge that posts your best score to a shared global leaderboard. Share a challenge link with friends so they can race the same passage and try to beat your WPM. No sign-up required; progress is saved locally and the app works offline as an installable PWA.</p>
-        <h2>How the typing test works</h2>
-        <ol>
-          <li>Pick a lesson, duration (60 seconds by default), and language — English or Hindi.</li>
-          <li>Type the highlighted text. Errors and fumbled keys are tracked in real time.</li>
-          <li>See your WPM, accuracy, and benchmark rating at the end, then open the leaderboard or challenge a friend.</li>
-        </ol>
-        <h2>What you can practice</h2>
-        <ul>
-          <li>60-second WPM speed test with live accuracy</li>
-          <li>English and Hindi typing practice lessons</li>
-          <li>Code typing practice in JavaScript syntax</li>
-          <li>Medical and complex word drills</li>
-          <li>Custom stories and pasted text</li>
-          <li>Weekly challenge with a global leaderboard</li>
-          <li>Friend challenges via shareable links</li>
-          <li>Streaks, XP, and level progression</li>
-        </ul>
-        <h2>Frequently asked questions</h2>
-        <p><strong>How is typing speed (WPM) measured?</strong><br />Your WPM is calculated from the characters you type correctly each minute. A standard word is five characters, so a 60-second test with 300 correct characters equals 60 WPM. Accuracy is the share of keystrokes you get right and counts toward your score alongside speed.</p>
-        <p><strong>Is the typing speed test free?</strong><br />Yes. The 60-second WPM test, every practice lesson, the weekly challenge, and all arcade mini-games are completely free with no account required. Progress is saved locally and the app works offline as an installable PWA.</p>
-        <p><strong>What typing content can I practice?</strong><br />English and Hindi (Devanagari) practice, JavaScript code typing with automatic bracket handling, medical and complex terminology drills, custom stories and pasted text, plus timed story races, zen freestyle, and strict exam mode with backspace disabled.</p>
-        <p><strong>How do I improve my words per minute?</strong><br />Practice daily, focus on accuracy before speed, use the on-screen hand guide to build correct finger placement, and retake short timed tests. The app tracks streaks, XP, and level so you can see steady improvement, and the weekly challenge lets you compare your WPM against other typists on the global leaderboard.</p>
-        <p><strong>Can I compare my typing speed with others?</strong><br />Yes. Finish a session to open the shared weekly leaderboard, where your best score for the current week is stored under your chosen name. You can also generate a challenge link and share it so friends can race the same passage and try to beat your WPM.</p>
-        <p><strong>Does Ribbon Typing Coach work on my phone?</strong><br />Yes. Ribbon is fully responsive with an on-screen keyboard for tablets and touch devices, and it can be installed as a progressive web app so it runs offline in fullscreen like a native app.</p>
-        <small>Ribbon Typing Coach is a free typing practice app for improving your words-per-minute speed and accuracy. It is not affiliated with any typing certification body. <a href="/privacy.html" rel="nofollow">Privacy Policy</a></small>
+      <div class="min-h-screen bg-[#0B0C10] text-zinc-100 font-sans antialiased selection:bg-amber-500/30">
+
+        <!-- ================= HEADER ================= -->
+        <header class="border-b border-zinc-800/70 bg-[#0B0C10]/90 sticky top-0 z-40 backdrop-blur">
+          <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl font-black tracking-tighter bg-gradient-to-r from-amber-200 via-amber-400 to-amber-600 bg-clip-text text-transparent">Ribbon</span>
+              <span class="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md uppercase tracking-wide hidden sm:inline-block">Free Typing Test</span>
+            </div>
+            <nav class="hidden md:flex items-center gap-6 text-sm text-zinc-400 font-medium">
+              <a href="#speed-test" class="hover:text-amber-400 transition-colors">Speed test</a>
+              <a href="#lessons" class="hover:text-amber-400 transition-colors">Lessons</a>
+              <a href="#hindi" class="hover:text-amber-400 transition-colors">Hindi</a>
+              <a href="#code" class="hover:text-amber-400 transition-colors">Code</a>
+              <a href="#modes" class="hover:text-amber-400 transition-colors">Modes</a>
+              <a href="#leaderboard" class="hover:text-amber-400 transition-colors">Leaderboard</a>
+              <a href="#faq" class="hover:text-amber-400 transition-colors">FAQ</a>
+            </nav>
+            <a href="/app" class="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-[#0B0C10] text-sm font-bold hover:opacity-90 active:scale-95 transition-all shadow-[0_0_20px_rgba(245,158,11,0.25)]">Open the App</a>
+          </div>
+        </header>
+
+        <!-- ================= HERO ================= -->
+        <section class="relative overflow-hidden">
+          <div class="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,rgba(245,158,11,0.12),transparent_55%)]"></div>
+          <div class="relative max-w-6xl mx-auto px-4 sm:px-6 pt-16 pb-14 text-center">
+            <p class="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+              Free · No sign-up · No ads · Works offline
+            </p>
+            <h1 class="mt-6 text-4xl sm:text-5xl lg:text-6xl font-black leading-[1.08] tracking-tight text-balance">
+              Free Typing Speed Test —<br class="hidden sm:block" />
+              Measure Your <span class="text-amber-400">WPM &amp; Accuracy</span> Live
+            </h1>
+            <p class="mx-auto mt-6 max-w-3xl text-base sm:text-lg text-zinc-400 leading-relaxed">
+              A real typing speed test that shows your words-per-minute (WPM) and typing accuracy
+              the moment you type. Practice with <strong class="text-zinc-200">113 guided lessons</strong> across
+              English, Hindi (Devanagari), JavaScript code and medical terminology — perfect for
+              typing practice for beginners and for anyone who wants to type faster, every single day.
+            </p>
+            <div class="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <a href="/app?start=test" class="px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 text-[#0B0C10] font-extrabold text-base hover:opacity-90 active:scale-95 transition-all shadow-[0_0_30px_rgba(245,158,11,0.3)] w-full sm:w-auto text-center">
+                Start the Free Typing Speed Test
+              </a>
+              <a href="#lessons" class="px-7 py-3.5 rounded-2xl border border-zinc-700 text-zinc-200 font-bold text-base hover:border-amber-500/50 hover:text-amber-400 active:scale-95 transition-all w-full sm:w-auto text-center">
+                Explore the 113 lessons
+              </a>
+            </div>
+            <div class="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm font-mono text-zinc-500">
+              <span><span class="text-amber-400 font-bold">113</span> guided lessons</span>
+              <span class="hidden sm:inline text-zinc-700">·</span>
+              <span><span class="text-amber-400 font-bold">93</span> practice stories</span>
+              <span class="hidden sm:inline text-zinc-700">·</span>
+              <span><span class="text-amber-400 font-bold">10</span> classic paragraphs</span>
+              <span class="hidden sm:inline text-zinc-700">·</span>
+              <span>Real-time WPM + accuracy</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= SPEED TEST ================= -->
+        <section id="speed-test" class="border-t border-zinc-800/60 bg-[#10111A]">
+          <div class="max-w-6xl mx-auto px-4 sm:px-6 py-16 grid gap-10 lg:grid-cols-2 seo-layout lg:items-center">
+            <div>
+              <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Take a Free Typing Speed Test (WPM) in 60 Seconds</h2>
+              <p class="mt-4 text-zinc-400 leading-relaxed">
+                Click the button and start typing a real story. Your words per minute and typing
+                accuracy are calculated in real time while your errors, fumbled keys and backspaces
+                are tracked for an honest score. Finished? You get an instant WPM benchmark, then can
+                retake, open the weekly leaderboard, or challenge a friend to beat your result.
+              </p>
+              <ul class="mt-6 space-y-2.5 text-sm text-zinc-300">
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>Live WPM, accuracy and timer while you type</li>
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>60-second tests, plus custom durations and untimed practice</li>
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>Error, fumble and keystroke stats after every run</li>
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>WPM history so you can watch your speed improve</li>
+              </ul>
+              <a href="/app?start=test" class="mt-8 inline-flex px-6 py-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-400 font-bold hover:bg-amber-500/25 active:scale-95 transition-all">
+                Take the typing speed test →
+              </a>
+            </div>
+            <div class="rounded-3xl border border-zinc-800 bg-[#0B0C10] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+              <p class="text-xs font-mono uppercase tracking-widest text-zinc-500">Live result — typing test with WPM &amp; accuracy</p>
+              <div class="mt-5 grid grid-cols-2 gap-3">
+                <div class="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4">
+                  <p class="text-[11px] font-mono uppercase tracking-wider text-emerald-500/80">WPM</p>
+                  <p class="mt-1 text-3xl font-black text-emerald-400">63</p>
+                </div>
+                <div class="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4">
+                  <p class="text-[11px] font-mono uppercase tracking-wider text-emerald-500/80">ACCURACY</p>
+                  <p class="mt-1 text-3xl font-black text-emerald-400">97.4%</p>
+                </div>
+              </div>
+              <div class="mt-3 rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
+                <p class="text-[11px] font-mono uppercase tracking-wider text-zinc-500">Time</p>
+                <p class="mt-1 font-mono text-zinc-200">0:42 / 1:00</p>
+              </div>
+              <p class="mt-5 text-xs leading-relaxed text-zinc-500">
+                Example scores shown for illustration. Your own results update live as you type in the app.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= LESSONS ================= -->
+        <section id="lessons" class="border-t border-zinc-800/60">
+          <div class="max-w-6xl mx-auto px-4 sm:px-6 py-16 grid gap-10 lg:grid-cols-2 seo-layout lg:items-center">
+            <div class="rounded-3xl border border-zinc-800 bg-[#10111A] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3)] order-2 lg:order-1">
+              <p class="text-xs font-mono uppercase tracking-widest text-zinc-500">Lesson card — Home Row Drills</p>
+              <p class="mt-4 text-lg font-bold text-zinc-100">Lesson 0: Home Row Drills (Beginner)</p>
+              <p class="mt-1 text-sm text-zinc-400">Pure home row drills for complete beginners.</p>
+              <div class="mt-4 rounded-xl border border-zinc-800 bg-[#0B0C10] p-4 font-mono text-sm text-zinc-300 leading-loose">
+                a s d f j k l ; &nbsp;·&nbsp; ask dad lad fall flash glad flask sad
+              </div>
+              <p class="mt-4 text-xs text-zinc-500">With the on-screen hand guide and keyboard so you always know which finger is next.</p>
+            </div>
+            <div class="order-1 lg:order-2">
+              <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Typing Practice for Beginners: Learn the Home Row</h2>
+              <p class="mt-4 text-zinc-400 leading-relaxed">
+                Start from the very first lesson and build correct muscle memory: home row,
+                top row, bottom row and numbers, then Shift and punctuation. An illustrated hand
+                guide and on-screen keyboard show exactly which finger presses which key, so beginners
+                never have to guess.
+              </p>
+              <ul class="mt-6 space-y-2.5 text-sm text-zinc-300">
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>Structured beginner drills before you touch real words</li>
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>Accuracy-first scoring with streaks, XP and levels</li>
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>Alternate layouts: Dvorak and Colemak are supported</li>
+              </ul>
+              <a href="/app?start=beginner" class="mt-8 inline-flex px-6 py-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-400 font-bold hover:bg-amber-500/25 active:scale-95 transition-all">
+                Start beginner typing practice →
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= HINDI ================= -->
+        <section id="hindi" class="border-t border-zinc-800/60 bg-[#10111A]">
+          <div class="max-w-6xl mx-auto px-4 sm:px-6 py-16 grid gap-10 lg:grid-cols-2 seo-layout lg:items-center">
+            <div>
+              <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Hindi Typing Lessons (Devanagari) &amp; Hindi Stories</h2>
+              <p class="mt-4 text-zinc-400 leading-relaxed">
+                Proper Hindi typing lessons in Devanagari script — home-row matras first, then real
+                Panchatantra-style stories and government clerical exam passages. Practise Hindi
+                typing online for job tests or simply for personal speed, with the same live WPM and
+                accuracy tracking as English.
+              </p>
+              <ul class="mt-6 space-y-2.5 text-sm text-zinc-300">
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>5 stage-based Hindi touch typing lessons for beginners</li>
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>18 Hindi practice stories with 120+ words each</li>
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>Clerical civil exam passages in Hindi (backspace disabled)</li>
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>Devanagari text renders clearly on any keyboard layout</li>
+              </ul>
+              <a href="/app?start=hindi" class="mt-8 inline-flex px-6 py-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-400 font-bold hover:bg-amber-500/25 active:scale-95 transition-all">
+                Open Hindi typing practice →
+              </a>
+            </div>
+            <div class="rounded-3xl border border-zinc-800 bg-[#0B0C10] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
+              <p class="text-xs font-mono uppercase tracking-widest text-zinc-500">Hindi lesson sample</p>
+              <p class="mt-4 text-2xl font-bold leading-relaxed" style="font-family:'Noto Sans Devanagari',sans-serif;">
+                एक वन में एक खरगोश और एक कछुआ रहते थे।
+              </p>
+              <p class="mt-4 text-sm text-zinc-400">कछुआ और खरगोश — Story 1 · 120 words · Easy</p>
+              <a href="/app?start=hindi" class="mt-4 inline-block text-amber-400 font-bold text-sm hover:underline">Try this Hindi story →</a>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= CODE & MEDICAL / PARAGRAPHS ================= -->
+        <section id="code" class="border-t border-zinc-800/60">
+          <div class="max-w-6xl mx-auto px-4 sm:px-6 py-16 grid gap-10 lg:grid-cols-2 seo-layout lg:items-center">
+            <div class="rounded-3xl border border-zinc-800 bg-[#10111A] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3)] order-2 lg:order-1">
+              <p class="text-xs font-mono uppercase tracking-widest text-zinc-500">Code lesson sample — JavaScript</p>
+              <pre class="mt-4 rounded-xl border border-zinc-800 bg-[#0B0C10] p-4 text-sm leading-relaxed overflow-x-auto"><code class="font-mono text-emerald-300">function debounce(fn, delay = 250) {
+  let timer = null;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}</code></pre>
+              <p class="mt-4 text-xs text-zinc-500">Auto-inserted brackets and indentation behave like an IDE as you type.</p>
+            </div>
+            <div class="order-1 lg:order-2">
+              <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">JavaScript Code Typing Practice</h2>
+              <p class="mt-4 text-zinc-400 leading-relaxed">
+                Stop typing nonsense drills and practice real syntax. Code mode streams actual
+                JavaScript snippets with automatic bracket completion, so you build the exact
+                muscle memory developers use on the job.
+              </p>
+              <ul class="mt-6 space-y-2.5 text-sm text-zinc-300">
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>Fresh random snippets on every reset — never the same file twice</li>
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>Auto-brackets, indentation and punctuation tracking</li>
+                <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">→</span>WPM and accuracy scored exactly like a timed test</li>
+              </ul>
+              <a href="/app?start=code" class="mt-8 inline-flex px-6 py-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-400 font-bold hover:bg-amber-500/25 active:scale-95 transition-all">
+                Practice code typing →
+              </a>
+
+              <h3 class="mt-10 text-2xl font-extrabold tracking-tight" id="paragraphs">Typing Test with Paragraphs &amp; Medical Drills</h3>
+              <p class="mt-3 text-zinc-400 leading-relaxed">
+                Type real paragraphs, not one-word lists. Choose from 93 practice stories and 10 classic
+                literature paragraphs (Alice in Wonderland, Sherlock Holmes, Moby Dick and more), or push
+                your visual endurance with dense medical terminology.
+              </p>
+              <div class="mt-5 flex flex-wrap gap-3">
+                <a href="/app?start=passages" class="inline-flex px-5 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-400 font-bold text-sm hover:bg-amber-500/25 active:scale-95 transition-all">
+                  Browse practice stories →
+                </a>
+                <a href="/app?start=medical" class="inline-flex px-5 py-2.5 rounded-xl border border-zinc-700 text-zinc-200 font-bold text-sm hover:border-amber-500/50 hover:text-amber-400 active:scale-95 transition-all">
+                  Try medical typing drills →
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= MODES ================= -->
+        <section id="modes" class="border-t border-zinc-800/60 bg-[#10111A]">
+          <div class="max-w-6xl mx-auto px-4 sm:px-6 py-16">
+            <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-center">Keep Typing Practice Fun: Races, Arcade &amp; More</h2>
+            <p class="mx-auto mt-4 max-w-2xl text-center text-zinc-400 leading-relaxed">
+              Beyond lessons and timed tests, Ribbon has game-like modes that keep your fingers moving —
+              each one still scores your real WPM and accuracy.
+            </p>
+            <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <a href="/app?start=race" class="group rounded-3xl border border-zinc-800 bg-[#0B0C10] p-6 hover:border-amber-500/40 transition-all">
+                <h3 class="font-extrabold text-lg group-hover:text-amber-400 transition-colors">AI Bot Race</h3>
+                <p class="mt-2 text-sm text-zinc-400">Race the same passage against AI opponents that speed up as you do. Beat them to the finish line.</p>
+                <span class="mt-4 inline-block text-amber-400 font-bold text-sm">Race now →</span>
+              </a>
+              <a href="/app?start=boss" class="group rounded-3xl border border-zinc-800 bg-[#0B0C10] p-6 hover:border-amber-500/40 transition-all">
+                <h3 class="font-extrabold text-lg group-hover:text-amber-400 transition-colors">Boss Battle</h3>
+                <p class="mt-2 text-sm text-zinc-400">An adaptive boss that matches your pace — type fast and accurately to land hits and win.</p>
+                <span class="mt-4 inline-block text-amber-400 font-bold text-sm">Battle the boss →</span>
+              </a>
+              <a href="/app?start=arcade" class="group rounded-3xl border border-zinc-800 bg-[#0B0C10] p-6 hover:border-amber-500/40 transition-all">
+                <h3 class="font-extrabold text-lg group-hover:text-amber-400 transition-colors">Arcade Mini-Games</h3>
+                <p class="mt-2 text-sm text-zinc-400">Falling letters and arcade challenges that reward speed with shield energy and high scores.</p>
+                <span class="mt-4 inline-block text-amber-400 font-bold text-sm">Play arcade →</span>
+              </a>
+              <a href="/app?start=zen" class="group rounded-3xl border border-zinc-800 bg-[#0B0C10] p-6 hover:border-amber-500/40 transition-all">
+                <h3 class="font-extrabold text-lg group-hover:text-amber-400 transition-colors">Zen &amp; Freestyle</h3>
+                <p class="mt-2 text-sm text-zinc-400">No timer, no pressure. Flow through long passages and relax into a calm, steady rhythm.</p>
+                <span class="mt-4 inline-block text-amber-400 font-bold text-sm">Go zen →</span>
+              </a>
+              <a href="/app?start=passages" class="group rounded-3xl border border-zinc-800 bg-[#0B0C10] p-6 hover:border-amber-500/40 transition-all">
+                <h3 class="font-extrabold text-lg group-hover:text-amber-400 transition-colors">Exam Mode</h3>
+                <p class="mt-2 text-sm text-zinc-400">Strict clerical-style typing: backspace disabled, official passage formats, accuracy counted hard.</p>
+                <span class="mt-4 inline-block text-amber-400 font-bold text-sm">Try exam passages →</span>
+              </a>
+              <a href="/app" class="group rounded-3xl border border-zinc-800 bg-[#0B0C10] p-6 hover:border-amber-500/40 transition-all">
+                <h3 class="font-extrabold text-lg group-hover:text-amber-400 transition-colors">Custom Stories</h3>
+                <p class="mt-2 text-sm text-zinc-400">Paste any text — essays, lyrics, subtitles — and practice typing your own real-world material.</p>
+                <span class="mt-4 inline-block text-amber-400 font-bold text-sm">Paste your own →</span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= LEADERBOARD ================= -->
+        <section id="leaderboard" class="border-t border-zinc-800/60">
+          <div class="max-w-6xl mx-auto px-4 sm:px-6 py-16 text-center">
+            <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Weekly Typing Challenge &amp; Global Leaderboard</h2>
+            <p class="mx-auto mt-4 max-w-2xl text-zinc-400 leading-relaxed">
+              Every week a new passage is set. Type it, and your best WPM and accuracy are saved under
+              your chosen name on the shared leaderboard. Compare yourself with typists worldwide,
+              protect your streak, and send a challenge link to friends so they try to beat your score
+              on the exact same text.
+            </p>
+            <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
+              <a href="/app?start=weekly" class="px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 text-[#0B0C10] font-extrabold hover:opacity-90 active:scale-95 transition-all">
+                Open this week's challenge
+              </a>
+              <a href="/app?start=leaderboard" class="px-6 py-3 rounded-2xl border border-zinc-700 text-zinc-200 font-bold hover:border-amber-500/50 hover:text-amber-400 active:scale-95 transition-all">
+                View the leaderboard
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= HOW IT WORKS ================= -->
+        <section class="border-t border-zinc-800/60 bg-[#10111A]">
+          <div class="max-w-6xl mx-auto px-4 sm:px-6 py-16">
+            <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-center">How the Free Typing Test Works</h2>
+            <ol class="mt-10 grid gap-6 md:grid-cols-3">
+              <li class="rounded-3xl border border-zinc-800 bg-[#0B0C10] p-6">
+                <p class="font-mono text-amber-400 font-black">01</p>
+                <h3 class="mt-3 font-bold text-lg">Pick a test</h3>
+                <p class="mt-2 text-sm text-zinc-400 leading-relaxed">Choose a 60-second speed test, a lesson, a story, or a code snippet. English or Hindi — your call.</p>
+              </li>
+              <li class="rounded-3xl border border-zinc-800 bg-[#0B0C10] p-6">
+                <p class="font-mono text-amber-400 font-black">02</p>
+                <h3 class="mt-3 font-bold text-lg">Type the highlighted text</h3>
+                <p class="mt-2 text-sm text-zinc-400 leading-relaxed">WPM, accuracy and errors update live. Errors and fumbled keys are tracked so your score stays honest.</p>
+              </li>
+              <li class="rounded-3xl border border-zinc-800 bg-[#0B0C10] p-6">
+                <p class="font-mono text-amber-400 font-black">03</p>
+                <h3 class="mt-3 font-bold text-lg">See your WPM result</h3>
+                <p class="mt-2 text-sm text-zinc-400 leading-relaxed">Get your benchmark, watch your history climb, and open the leaderboard or challenge a friend.</p>
+              </li>
+            </ol>
+            <p class="mt-10 text-center text-sm text-zinc-500">
+              No account, no email, no paywall. Progress lives in your browser — and Ribbon works offline as an installable app.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================= FAQ ================= -->
+        <section id="faq" class="border-t border-zinc-800/60">
+          <div class="max-w-3xl mx-auto px-4 sm:px-6 py-16">
+            <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-center">Typing Speed Test — Frequently Asked Questions</h2>
+            <div class="mt-10 space-y-3">
+              <details class="group rounded-2xl border border-zinc-800 bg-[#10111A] px-5 py-4 open:border-amber-500/30">
+                <summary class="cursor-pointer font-semibold text-zinc-100 list-none flex items-center justify-between gap-3">
+                  How is typing speed (WPM) measured?
+                  <span class="text-amber-400 group-open:rotate-45 transition-transform">+</span>
+                </summary>
+                <p class="mt-3 text-sm text-zinc-400 leading-relaxed">Your WPM is calculated from the characters you type correctly each minute. A standard word is five characters, so a 60-second test with 300 correct characters equals 60 WPM. Accuracy is the share of keystrokes you get right and counts toward your score alongside speed.</p>
+              </details>
+              <details class="group rounded-2xl border border-zinc-800 bg-[#10111A] px-5 py-4 open:border-amber-500/30">
+                <summary class="cursor-pointer font-semibold text-zinc-100 list-none flex items-center justify-between gap-3">
+                  Is the typing speed test free?
+                  <span class="text-amber-400 group-open:rotate-45 transition-transform">+</span>
+                </summary>
+                <p class="mt-3 text-sm text-zinc-400 leading-relaxed">Yes. The 60-second WPM test, every practice lesson, the weekly challenge, and all arcade mini-games are completely free with no account required. Progress is saved locally and the app works offline as an installable PWA.</p>
+              </details>
+              <details class="group rounded-2xl border border-zinc-800 bg-[#10111A] px-5 py-4 open:border-amber-500/30">
+                <summary class="cursor-pointer font-semibold text-zinc-100 list-none flex items-center justify-between gap-3">
+                  What typing content can I practice?
+                  <span class="text-amber-400 group-open:rotate-45 transition-transform">+</span>
+                </summary>
+                <p class="mt-3 text-sm text-zinc-400 leading-relaxed">English and Hindi (Devanagari) practice, JavaScript code typing with automatic bracket handling, medical and complex terminology drills, custom stories and pasted text, plus timed story races, zen freestyle, and strict exam mode with backspace disabled.</p>
+              </details>
+              <details class="group rounded-2xl border border-zinc-800 bg-[#10111A] px-5 py-4 open:border-amber-500/30">
+                <summary class="cursor-pointer font-semibold text-zinc-100 list-none flex items-center justify-between gap-3">
+                  How do I improve my words per minute?
+                  <span class="text-amber-400 group-open:rotate-45 transition-transform">+</span>
+                </summary>
+                <p class="mt-3 text-sm text-zinc-400 leading-relaxed">Practice daily, focus on accuracy before speed, use the on-screen hand guide to build correct finger placement, and retake short timed tests. The app tracks streaks, XP, and level so you can see steady improvement, and the weekly challenge lets you compare your WPM against other typists on the global leaderboard.</p>
+              </details>
+              <details class="group rounded-2xl border border-zinc-800 bg-[#10111A] px-5 py-4 open:border-amber-500/30">
+                <summary class="cursor-pointer font-semibold text-zinc-100 list-none flex items-center justify-between gap-3">
+                  Can I compare my typing speed with others?
+                  <span class="text-amber-400 group-open:rotate-45 transition-transform">+</span>
+                </summary>
+                <p class="mt-3 text-sm text-zinc-400 leading-relaxed">Yes. Finish a session to open the shared weekly leaderboard, where your best score for the current week is stored under your chosen name. You can also generate a challenge link and share it so friends can race the same passage and try to beat your WPM.</p>
+              </details>
+              <details class="group rounded-2xl border border-zinc-800 bg-[#10111A] px-5 py-4 open:border-amber-500/30">
+                <summary class="cursor-pointer font-semibold text-zinc-100 list-none flex items-center justify-between gap-3">
+                  Does Ribbon Typing Coach work on my phone?
+                  <span class="text-amber-400 group-open:rotate-45 transition-transform">+</span>
+                </summary>
+                <p class="mt-3 text-sm text-zinc-400 leading-relaxed">Yes. Ribbon is fully responsive with an on-screen keyboard for tablets and touch devices, and it can be installed as a progressive web app so it runs offline in fullscreen like a native app.</p>
+              </details>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= FINAL CTA ================= -->
+        <section class="border-t border-zinc-800/60 bg-[#10111A]">
+          <div class="max-w-4xl mx-auto px-4 sm:px-6 py-16 text-center">
+            <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Ready to See Your Real WPM?</h2>
+            <p class="mx-auto mt-4 max-w-xl text-zinc-400 leading-relaxed">
+              It takes 60 seconds and no sign-up. Measure your typing speed and accuracy, then start
+              your first lesson.
+            </p>
+            <a href="/app?start=test" class="mt-8 inline-flex px-8 py-4 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 text-[#0B0C10] font-extrabold text-lg hover:opacity-90 active:scale-95 transition-all shadow-[0_0_30px_rgba(245,158,11,0.3)]">
+              Start the free typing speed test
+            </a>
+          </div>
+        </section>
+
+        <!-- ================= FOOTER ================= -->
+        <footer class="border-t border-zinc-800/60">
+          <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p class="text-sm text-zinc-500">Ribbon Typing Coach is a free typing practice app for improving your words-per-minute speed and accuracy. It is not affiliated with any typing certification body.</p>
+            <nav class="flex items-center gap-5 text-sm text-zinc-500 shrink-0">
+              <a href="#speed-test" class="hover:text-amber-400 transition-colors">Back to top</a>
+              <a href="/privacy.html" rel="nofollow" class="hover:text-amber-400 transition-colors">Privacy Policy</a>
+            </nav>
+          </div>
+        </footer>
+
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
