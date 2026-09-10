@@ -480,9 +480,17 @@ export default function App() {
   }, []);
 
   const handleHorizontalWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    if (e.deltaY !== 0 && !e.shiftKey) {
-      e.currentTarget.scrollLeft += e.deltaY;
-    }
+    const el = e.currentTarget;
+    const absX = Math.abs(e.deltaX);
+    const absY = Math.abs(e.deltaY);
+    // Trackpad two-finger horizontal gesture: let the browser scroll natively.
+    if (absX > absY) return;
+    // Plain vertical wheel: never hijack it, so the page scrolls normally.
+    if (!e.shiftKey) return;
+    const canScrollLeft = el.scrollLeft > 0;
+    const canScrollRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    if ((e.deltaY < 0 && !canScrollLeft) || (e.deltaY > 0 && !canScrollRight)) return;
+    el.scrollLeft += e.deltaY;
   }, []);
 
   const handleSaveAndStartCustomStory = (startImmediately: boolean = true) => {
@@ -544,10 +552,12 @@ export default function App() {
   const [durationMenuOpen, setDurationMenuOpen] = useState<boolean>(false);
   const [durationMenuPos, setDurationMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [aiStoryPos, setAiStoryPos] = useState<{ top: number; left: number } | null>(null);
+  const [modeStripScroll, setModeStripScroll] = useState<{ left: boolean; right: boolean }>({ left: false, right: false });
   const modesMenuBtnRef = useRef<HTMLButtonElement | null>(null);
   const contentMenuBtnRef = useRef<HTMLButtonElement | null>(null);
   const durationMenuBtnRef = useRef<HTMLButtonElement | null>(null);
   const aiStoryBtnRef = useRef<HTMLButtonElement | null>(null);
+  const modeStripRef = useRef<HTMLDivElement | null>(null);
   // Unified typing state for batch updates
   const [typingState, setTypingState] = useState<{
     typedText: string;
@@ -3669,6 +3679,41 @@ export default function App() {
 
   const themeConfig = getThemeStyles();
 
+  const updateModeStripScroll = useCallback(() => {
+    const el = modeStripRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 2;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    setModeStripScroll(prev => (prev.left === left && prev.right === right ? prev : { left, right }));
+  }, []);
+
+  const scrollModeStripBy = useCallback((direction: -1 | 1) => {
+    const el = modeStripRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction * Math.max(160, el.clientWidth * 0.6), behavior: 'smooth' });
+  }, []);
+
+  // Keep the currently active mode/content pill visible, and refresh the
+  // overflow indicators whenever the selection changes.
+  useEffect(() => {
+    const el = modeStripRef.current;
+    if (!el) return;
+    const active = el.querySelector<HTMLElement>('[data-mode-strip-active="true"]');
+    if (active) active.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    updateModeStripScroll();
+  }, [activeModal, arcadeActive, freestyleMode, zenMode, botRaceActive, adaptiveBossActive, examMode, activeAppMode, testDuration, updateModeStripScroll]);
+
+  // Recompute fade/arrow visibility on viewport and content-size changes.
+  useEffect(() => {
+    const el = modeStripRef.current;
+    if (!el) return;
+    updateModeStripScroll();
+    const observer = new ResizeObserver(updateModeStripScroll);
+    observer.observe(el);
+    (Array.from(el.children) as Element[]).forEach(child => observer.observe(child));
+    return () => observer.disconnect();
+  }, [updateModeStripScroll]);
+
   return (
     <div
       className="min-h-screen text-[#C5C6C7] flex items-stretch xl:overflow-hidden font-sans relative selection:bg-[#F59E0B] selection:text-[#0B0C10] pb-[env(safe-area-inset-bottom)]"
@@ -4234,10 +4279,26 @@ export default function App() {
             </div>
 
             {/* Fix #2 — Mode/Difficulty Selector Row (Neutral Default, Gold Accent Active Highlight) */}
-            <div
-              onWheel={handleHorizontalWheel}
-              className="w-full flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-smooth overscroll-x-contain touch-pan-x bg-[#0A0C16]/90 border border-zinc-800/80 rounded-2xl px-2.5 py-1 shrink-0 mb-2 backdrop-blur-xl select-none shadow-xl"
-            >
+            <div className="relative w-full shrink-0 mb-2">
+              {modeStripScroll.left && (
+                <>
+                  <div className="pointer-events-none absolute inset-y-0 left-0 w-10 z-10 rounded-l-2xl bg-gradient-to-r from-[#0A0C16] via-[#0A0C16]/80 to-transparent" />
+                  <button
+                    type="button"
+                    onClick={() => { scrollModeStripBy(-1); sfx.playClick(); }}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-6 h-6 flex items-center justify-center rounded-full bg-[#141422]/90 border border-zinc-700/80 text-zinc-300 hover:text-[#F59E0B] hover:border-[#F59E0B]/60 transition-all cursor-pointer shadow-lg"
+                    title="Scroll modes left"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
+              <div
+                ref={modeStripRef}
+                onScroll={updateModeStripScroll}
+                onWheel={handleHorizontalWheel}
+                className="w-full flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-smooth overscroll-x-contain touch-pan-x bg-[#0A0C16]/90 border border-zinc-800/80 rounded-2xl px-2.5 py-1 backdrop-blur-xl select-none shadow-xl"
+              >
               {/* Duration Dropdown (custom menu — matches modes/content dropdowns) */}
               <div className="relative inline-flex items-center shrink-0">
                 <button
@@ -4258,6 +4319,7 @@ export default function App() {
                       ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
                       : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
                   }`}
+                  data-mode-strip-active={testDuration !== null}
                   title="Test duration"
                 >
                   <Timer className="w-3.5 h-3.5" />
@@ -4272,6 +4334,7 @@ export default function App() {
               {/* Mode Pills — All Neutral Default, Gold Active Only */}
               <button
                 onClick={() => { setBotRaceActive(false); setAdaptiveBossActive(false); setFreestyleMode(false); setZenMode(false); handleModeChange("normal"); setSelectedStoryId(null); const defaultL = LESSONS.find(l => l.id === 101) || LESSONS[0]; setCurrentLesson(defaultL); setArcadeActive(false); handleResetSession(); sfx.playClick(); }}
+                data-mode-strip-active={!freestyleMode && !arcadeActive && !botRaceActive && !adaptiveBossActive && !examMode && activeModal !== 'practice'}
                 className={`px-2.5 py-1 text-[11px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   !freestyleMode && !arcadeActive && !botRaceActive && !adaptiveBossActive && !examMode && activeModal !== 'practice'
                     ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
@@ -4285,6 +4348,7 @@ export default function App() {
                   setActiveModal('practice');
                   sfx.playClick();
                 }}
+                data-mode-strip-active={activeModal === 'practice' || (currentLesson.category && currentLesson.category.startsWith("Practice Stories") && !freestyleMode)}
                 className={`px-2.5 py-1 text-[11px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1 ${
                   activeModal === 'practice' || (currentLesson.category && currentLesson.category.startsWith("Practice Stories") && !freestyleMode)
                     ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
@@ -4305,6 +4369,7 @@ export default function App() {
                     setAiStoryOpen(o => !o);
                     sfx.playClick();
                   }}
+                  data-mode-strip-active={aiStoryOpen}
                   className={`px-2.5 py-1 text-[11px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1 ${
                     aiStoryOpen
                       ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
@@ -4329,6 +4394,7 @@ export default function App() {
                   setModesMenuOpen(o => !o);
                   sfx.playClick();
                 }}
+                data-mode-strip-active={botRaceActive || adaptiveBossActive || arcadeActive || freestyleMode || examMode}
                 className={`px-2.5 py-1 text-[11px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1 ${
                   botRaceActive || adaptiveBossActive || arcadeActive || freestyleMode || examMode
                     ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
@@ -4363,6 +4429,7 @@ export default function App() {
                   setContentMenuOpen(o => !o);
                   sfx.playClick();
                 }}
+                data-mode-strip-active={activeAppMode !== 'normal'}
                 className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-mono font-black uppercase tracking-wider rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   activeAppMode !== 'normal'
                     ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)]'
@@ -4376,6 +4443,21 @@ export default function App() {
                 {activeAppMode === 'code' ? 'Code' : activeAppMode === 'medical' ? 'Medical' : 'Normal'}
                 {contentMenuOpen ? ' ▲' : ' ▼'}
               </button>
+              </div>
+
+              {modeStripScroll.right && (
+                <>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 w-10 z-10 rounded-r-2xl bg-gradient-to-l from-[#0A0C16] via-[#0A0C16]/80 to-transparent" />
+                  <button
+                    type="button"
+                    onClick={() => { scrollModeStripBy(1); sfx.playClick(); }}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-6 h-6 flex items-center justify-center rounded-full bg-[#141422]/90 border border-zinc-700/80 text-zinc-300 hover:text-[#F59E0B] hover:border-[#F59E0B]/60 transition-all cursor-pointer shadow-lg"
+                    title="Scroll modes right"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
             </div>
 
             {/* AI Story popover (fixed-position so it isn't clipped by the strip's overflow) */}
