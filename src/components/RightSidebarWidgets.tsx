@@ -114,7 +114,7 @@ const RightSidebarWidgetsImpl: React.FC<RightSidebarWidgetsProps> = ({
   return (
     <div className="flex flex-col gap-3.5 text-zinc-200 select-none font-sans">
       {/* 1. LIVE SESSION TELEMETRY */}
-      <div className="bg-zinc-900/70 border border-zinc-800/60 rounded-2xl p-3.5 backdrop-blur-md space-y-2.5">
+      <div className="bg-zinc-900/70 border border-zinc-800/60 rounded-2xl p-3.5 space-y-2.5">
         <div className="flex items-center justify-between text-xs font-mono font-bold text-zinc-400 uppercase tracking-wider">
           <div className="flex items-center gap-1.5">
             <Activity className="w-3.5 h-3.5 text-emerald-400" />
@@ -166,7 +166,7 @@ const RightSidebarWidgetsImpl: React.FC<RightSidebarWidgetsProps> = ({
       </div>
 
       {/* 2. KEYBOARD HEAT MAP */}
-      <div className="bg-zinc-900/70 border border-zinc-800/60 rounded-2xl p-3.5 backdrop-blur-md space-y-2.5">
+      <div className="bg-zinc-900/70 border border-zinc-800/60 rounded-2xl p-3.5 space-y-2.5">
         <div className="flex items-center justify-between text-xs font-mono font-bold text-zinc-400 uppercase tracking-wider">
           <span>Heat Map</span>
           <button
@@ -199,7 +199,7 @@ const RightSidebarWidgetsImpl: React.FC<RightSidebarWidgetsProps> = ({
       </div>
 
       {/* 3. LIVE RANKINGS */}
-      <div className="bg-zinc-900/70 border border-zinc-800/60 rounded-2xl p-3.5 backdrop-blur-md space-y-2.5">
+      <div className="bg-zinc-900/70 border border-zinc-800/60 rounded-2xl p-3.5 space-y-2.5">
         <div className="flex items-center justify-between text-xs font-mono font-bold text-zinc-400 uppercase tracking-wider">
           <div className="flex items-center gap-1.5">
             <Trophy className="w-3.5 h-3.5 text-amber-400" />
@@ -263,7 +263,7 @@ const RightSidebarWidgetsImpl: React.FC<RightSidebarWidgetsProps> = ({
       </div>
 
       {/* 4. NEXT BADGE QUEST CARD */}
-      <div className="bg-zinc-900/70 border border-zinc-800/60 rounded-2xl p-3.5 backdrop-blur-md space-y-2">
+      <div className="bg-zinc-900/70 border border-zinc-800/60 rounded-2xl p-3.5 space-y-2">
         <div className="flex items-center justify-between text-xs font-mono font-bold text-zinc-400 uppercase tracking-wider">
           <div className="flex items-center gap-1.5">
             <Award className="w-3.5 h-3.5 text-amber-400" />

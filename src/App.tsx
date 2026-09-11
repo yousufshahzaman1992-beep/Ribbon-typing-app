@@ -87,7 +87,13 @@ class MechanicalFeedback {
   public playClick(isSpace: boolean = false, isError: boolean = false) {
     if (!this.enabled || this.preset === 'silent') return;
     try {
-      this.init();
+      if (!this.ctx) {
+        // Constructing an AudioContext can stall the main thread on the first
+        // interaction. Defer it off the click's critical path so the UI
+        // (sidebar collapse, nav, typing) stays responsive; later clicks play.
+        setTimeout(() => { this.init(); }, 0);
+        return;
+      }
       if (!this.ctx) return;
 
       if (this.ctx.state === 'suspended') {
@@ -558,6 +564,7 @@ export default function App() {
   const durationMenuBtnRef = useRef<HTMLButtonElement | null>(null);
   const aiStoryBtnRef = useRef<HTMLButtonElement | null>(null);
   const modeStripRef = useRef<HTMLDivElement | null>(null);
+  const modeStripScrollStateRef = useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
   // Unified typing state for batch updates
   const [typingState, setTypingState] = useState<{
     typedText: string;
@@ -3684,7 +3691,10 @@ export default function App() {
     if (!el) return;
     const left = el.scrollLeft > 2;
     const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
-    setModeStripScroll(prev => (prev.left === left && prev.right === right ? prev : { left, right }));
+    const prev = modeStripScrollStateRef.current;
+    if (prev.left === left && prev.right === right) return;
+    modeStripScrollStateRef.current = { left, right };
+    setModeStripScroll({ left, right });
   }, []);
 
   const scrollModeStripBy = useCallback((direction: -1 | 1) => {
@@ -3699,7 +3709,7 @@ export default function App() {
     const el = modeStripRef.current;
     if (!el) return;
     const active = el.querySelector<HTMLElement>('[data-mode-strip-active="true"]');
-    if (active) active.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    if (active) active.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
     updateModeStripScroll();
   }, [activeModal, arcadeActive, freestyleMode, zenMode, botRaceActive, adaptiveBossActive, examMode, activeAppMode, testDuration, updateModeStripScroll]);
 
@@ -3716,9 +3726,16 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen text-[#C5C6C7] flex items-stretch xl:overflow-hidden font-sans relative selection:bg-[#F59E0B] selection:text-[#0B0C10] pb-[env(safe-area-inset-bottom)]"
-      style={{ background: themeConfig.rootBg }}
+      className="min-h-screen text-[#C5C6C7] flex items-stretch xl:overflow-hidden font-sans relative isolate selection:bg-[#F59E0B] selection:text-[#0B0C10] pb-[env(safe-area-inset-bottom)]"
     >
+      {/* Static theme backdrop painted once into its own fixed layer so that
+          content repaints (typing, sidebar collapse) never re-rasterize the
+          full-viewport radial gradient behind them. */}
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 -z-10 pointer-events-none"
+        style={{ background: themeConfig.rootBg }}
+      />
       {goalToast && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#141419] border-2 border-[#F59E0B] p-4 rounded-[16px] shadow-[0_0_25px_rgba(245,158,11,0.25)] max-w-sm flex items-center gap-3 animate-bounce">
           <div className="text-2xl">🏆</div>
@@ -3775,7 +3792,7 @@ export default function App() {
         className={`
           hidden lg:flex
           ${sidebarExpanded ? 'w-[240px]' : 'w-[64px]'}
-          flex-col justify-between items-stretch py-6 select-none bg-[#0D0F1A]/95 border-r border-zinc-800/80 shadow-2xl backdrop-blur-xl transition-all duration-300 ease-in-out shrink-0 h-screen z-50 relative
+          flex-col justify-between items-stretch py-6 select-none bg-[#0D0F1A] border-r border-zinc-800/80 shadow-2xl transition-[width] duration-200 ease-out shrink-0 h-screen z-50 relative
         `}
       >
         <div className="flex flex-col items-stretch w-full">
@@ -3828,7 +3845,7 @@ export default function App() {
           <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-zinc-800 to-transparent my-4" />
 
           {/* Navigation Action items */}
-          <nav className="flex flex-col gap-1 w-full items-stretch overflow-y-auto scrollbar-none max-h-[calc(100vh-180px)]">
+          <nav className="flex flex-col gap-1 w-full items-stretch overflow-y-auto overscroll-contain scrollbar-none max-h-[calc(100vh-180px)] [contain:paint]">
             
             {/* CATEGORY 1: DRILLS & PRACTICE */}
             {sidebarExpanded && (
@@ -4129,9 +4146,9 @@ export default function App() {
         <div className="flex flex-1 flex-row w-full h-full overflow-hidden relative">
 
           {/* Main Workspace Column */}
-          <div className={`${sidebarCollapsed ? 'w-full' : 'w-full lg:w-[74%]'} h-full flex flex-col justify-between p-3 sm:p-4 xl:p-5 overflow-hidden transition-[width,padding,margin] duration-500 ease-in-out will-change-[width]`}>
+          <div className={`${sidebarCollapsed ? 'w-full' : 'w-full lg:w-[74%]'} h-full flex flex-col justify-between p-3 sm:p-4 xl:p-5 overflow-hidden transition-[width] duration-200 ease-out`}>
             {/* TopBar Redesign — Sleek Linear Premium Glassmorphism Top Header */}
-            <div className="flex flex-wrap min-h-11 py-1.5 shrink-0 items-center justify-between px-4 z-10 select-none bg-[#0D0F1A]/85 border border-zinc-800/80 border-t-amber-500/30 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] mb-2.5 max-w-full overflow-hidden gap-2 backdrop-blur-xl transition-all">
+            <div className="flex flex-wrap min-h-11 py-1.5 shrink-0 items-center justify-between px-4 z-10 select-none bg-[#0D0F1A]/85 border border-zinc-800/80 border-t-amber-500/30 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] mb-2.5 max-w-full overflow-hidden gap-2 transition-all">
               <div className="flex flex-wrap items-center gap-3">
                 {/* Hamburger Menu Button (small screens) — opens the slide-out drawer */}
                 <button
@@ -4297,7 +4314,7 @@ export default function App() {
                 ref={modeStripRef}
                 onScroll={updateModeStripScroll}
                 onWheel={handleHorizontalWheel}
-                className="w-full flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-smooth overscroll-x-contain touch-pan-x bg-[#0A0C16]/90 border border-zinc-800/80 rounded-2xl px-2.5 py-1 backdrop-blur-xl select-none shadow-xl"
+                className="w-full flex items-center gap-1.5 overflow-x-auto scrollbar-none overscroll-x-contain touch-pan-x bg-[#0A0C16]/90 border border-zinc-800/80 rounded-2xl px-2.5 py-1 select-none shadow-xl"
               >
               {/* Duration Dropdown (custom menu — matches modes/content dropdowns) */}
               <div className="relative inline-flex items-center shrink-0">
@@ -5030,7 +5047,7 @@ export default function App() {
 
           {/* Right Column (Sidebar) — Collapsible for 100% Distraction-Free Focus */}
           {!sidebarCollapsed && (
-            <div className="hidden lg:flex w-full lg:w-[26%] h-full flex-col justify-start gap-4 p-5 overflow-y-auto border-l border-zinc-800/40 select-none bg-[#11131E]/90 backdrop-blur-xl transition-all duration-300">
+            <div className="hidden lg:flex w-full lg:w-[26%] h-full flex-col justify-start gap-4 p-5 overflow-y-auto border-l border-zinc-800/40 select-none bg-[#11131E]">
               <RightSidebarWidgets
                 currentScript={currentScript}
                 onScriptToggle={handleScriptToggle}
