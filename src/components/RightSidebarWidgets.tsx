@@ -7,6 +7,7 @@ interface RightSidebarWidgetsProps {
   onScriptToggle: (script: 'english' | 'hindi') => void;
   liveWpm: number;
   liveAccuracy: number;
+  hasStarted: boolean;
   errorCount: number;
   streak: number;
   xp: number;
@@ -39,6 +40,7 @@ const RightSidebarWidgetsImpl: React.FC<RightSidebarWidgetsProps> = ({
   currentScript,
   liveWpm,
   liveAccuracy,
+  hasStarted,
   errorCount,
   streak,
   xp,
@@ -126,20 +128,20 @@ const RightSidebarWidgetsImpl: React.FC<RightSidebarWidgetsProps> = ({
         <div className="grid grid-cols-3 gap-2 text-center font-mono">
           <div className="bg-zinc-950/80 border border-zinc-800/60 p-2 rounded-xl">
             <span className="text-[10px] text-zinc-400 block uppercase font-bold">Speed</span>
-            <span className="text-base font-black text-emerald-400 block">{liveWpm}</span>
-            <span className="text-[10px] text-zinc-500">WPM</span>
+            <span className="text-base font-black text-emerald-400 block">{hasStarted ? liveWpm : '—'}</span>
+            <span className="text-[10px] text-zinc-400">WPM</span>
           </div>
 
           <div className="bg-zinc-950/80 border border-zinc-800/60 p-2 rounded-xl">
             <span className="text-[10px] text-zinc-400 block uppercase font-bold">Precision</span>
-            <span className="text-base font-black text-emerald-400 block">{liveAccuracy}%</span>
-            <span className="text-[10px] text-zinc-500">ACC</span>
+            <span className="text-base font-black text-emerald-400 block">{hasStarted ? `${liveAccuracy}%` : '—'}</span>
+            <span className="text-[10px] text-zinc-400">ACC</span>
           </div>
 
           <div className="bg-zinc-950/80 border border-zinc-800/60 p-2 rounded-xl">
             <span className="text-[10px] text-zinc-400 block uppercase font-bold">Misses</span>
-            <span className="text-base font-black text-rose-400 block">{errorCount}</span>
-            <span className="text-[10px] text-zinc-500">ERR</span>
+            <span className="text-base font-black text-rose-400 block">{hasStarted ? errorCount : '—'}</span>
+            <span className="text-[10px] text-zinc-400">ERR</span>
           </div>
         </div>
 
@@ -152,14 +154,14 @@ const RightSidebarWidgetsImpl: React.FC<RightSidebarWidgetsProps> = ({
                   className="w-full bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t transition-all duration-300"
                   style={{ height: `${Math.max(12, Math.round((count / maxPress) * 28))}px` }}
                 />
-                <span className="text-[8px] text-zinc-500 font-mono truncate w-full text-center">
+                <span className="text-[8px] text-zinc-400 font-mono truncate w-full text-center">
                   {keyName.replace('Key', '').toUpperCase()}
                 </span>
               </div>
             ))}
           </div>
         ) : (
-          <div className="h-12 w-full bg-zinc-950 border border-zinc-800/40 rounded-lg flex items-center justify-center text-[10px] text-zinc-500 font-mono">
+          <div className="h-12 w-full bg-zinc-950 border border-zinc-800/40 rounded-lg flex items-center justify-center text-[10px] text-zinc-400 font-mono">
             Start typing to see key usage
           </div>
         )}
@@ -256,7 +258,7 @@ const RightSidebarWidgetsImpl: React.FC<RightSidebarWidgetsProps> = ({
             )}
           </div>
         ) : (
-          <div className="p-2 rounded-xl bg-zinc-950/60 border border-zinc-800/40 text-center text-[10px] text-zinc-500 font-mono">
+          <div className="p-2 rounded-xl bg-zinc-950/60 border border-zinc-800/40 text-center text-[10px] text-zinc-400 font-mono">
             No rankings yet this week
           </div>
         )}
@@ -289,9 +291,9 @@ const RightSidebarWidgetsImpl: React.FC<RightSidebarWidgetsProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-xs font-bold text-zinc-200 truncate">Level {level}</div>
-            <div className="text-[10px] text-zinc-500">Progress: {xp % 500}/500 XP</div>
+            <div className="text-[10px] text-zinc-400">Progress: {xp % 500}/500 XP</div>
             {streak > 1 && (
-              <div className="text-[10px] text-zinc-500">Streak: {streak} days</div>
+              <div className="text-[10px] text-zinc-400">Streak: {streak} days</div>
             )}
           </div>
         </div>

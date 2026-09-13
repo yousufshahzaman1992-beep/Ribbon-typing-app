@@ -72,7 +72,7 @@ export const FINGER_LABELS = [
 const ENGLISH_LESSONS: Lesson[] = [
   { 
     id: 0, 
-    name: "Lesson 0: Home Row Drills (Beginner)", 
+    name: "Lesson 1: Home Row Drills (Beginner)", 
     keys: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'], 
     desc: "Pure home row drills for complete beginners.", 
     category: "Touch Typing Basics",
@@ -80,7 +80,7 @@ const ENGLISH_LESSONS: Lesson[] = [
   },
   { 
     id: 1, 
-    name: "Lesson 1: Home Row Combinations", 
+    name: "Lesson 2: Home Row Combinations", 
     keys: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'], 
     desc: "Combined key drills using the home row keys.", 
     category: "Touch Typing Basics",
@@ -88,7 +88,7 @@ const ENGLISH_LESSONS: Lesson[] = [
   },
   { 
     id: 2, 
-    name: "Lesson 2: Top Row Mastery", 
+    name: "Lesson 3: Top Row Mastery", 
     keys: ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'], 
     desc: "Top row letter combinations and short words.", 
     category: "Touch Typing Basics",
@@ -96,7 +96,7 @@ const ENGLISH_LESSONS: Lesson[] = [
   },
   { 
     id: 3, 
-    name: "Lesson 3: Bottom Row & Numbers", 
+    name: "Lesson 4: Bottom Row & Numbers", 
     keys: ['z', 'x', 'c', 'v', 'b', 'n', 'm', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'], 
     desc: "Bottom row keys mixed with standard numbers.", 
     category: "Touch Typing Basics",
@@ -104,7 +104,7 @@ const ENGLISH_LESSONS: Lesson[] = [
   },
   { 
     id: 4, 
-    name: "Lesson 4: Shift Key & Punctuation", 
+    name: "Lesson 5: Shift Key & Punctuation", 
     keys: ['A', 'S', 'D', 'F', 'J', 'K', 'L', ':', '?', '"'], 
     desc: "Repetitive practice with Shift and common punctuations.", 
     category: "Touch Typing Basics",

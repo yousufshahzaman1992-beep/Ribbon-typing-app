@@ -50,7 +50,8 @@ import {
   Ghost,
   Share2,
   Shuffle,
-  Brain
+  Brain,
+  MoreHorizontal
 } from 'lucide-react';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { OnboardingModal } from './components/OnboardingModal';
@@ -428,6 +429,10 @@ function getSmartSuggestion(partialWord: string): string {
   return match ? match.slice(lower.length) : '';
 }
 
+// Respect the user's motion preference for programmatic scrolling
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 export default function App() {
   const [activeModal, setActiveModal] = useState<'lessons' | 'practice' | 'stats' | 'settings' | 'leaderboard' | 'achievements' | 'friends' | 'themes' | 'history' | 'goals' | 'sounds' | 'calendar' | null>(null);
   const [sidebarExpanded, setSidebarExpanded] = useState<boolean>(true);
@@ -558,11 +563,14 @@ export default function App() {
   const [durationMenuOpen, setDurationMenuOpen] = useState<boolean>(false);
   const [durationMenuPos, setDurationMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [aiStoryPos, setAiStoryPos] = useState<{ top: number; left: number } | null>(null);
+  const [moreMenuOpen, setMoreMenuOpen] = useState<boolean>(false);
+  const [moreMenuPos, setMoreMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [modeStripScroll, setModeStripScroll] = useState<{ left: boolean; right: boolean }>({ left: false, right: false });
   const modesMenuBtnRef = useRef<HTMLButtonElement | null>(null);
   const contentMenuBtnRef = useRef<HTMLButtonElement | null>(null);
   const durationMenuBtnRef = useRef<HTMLButtonElement | null>(null);
   const aiStoryBtnRef = useRef<HTMLButtonElement | null>(null);
+  const moreMenuBtnRef = useRef<HTMLButtonElement | null>(null);
   const modeStripRef = useRef<HTMLDivElement | null>(null);
   const modeStripScrollStateRef = useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
   // Unified typing state for batch updates
@@ -2165,6 +2173,17 @@ export default function App() {
     return Math.round((typedText.length / 5) / (elapsed / 60));
   }, [typedText.length, elapsed, startTime]);
 
+  // Whether the user has typed anything this session (drives honest zero-states)
+  const hasStarted = typedText.length > 0;
+
+  // Lesson progress + word counters (memoized to keep large texts cheap)
+  const progressPct = useMemo(() => {
+    if (targetText.length === 0) return 0;
+    return Math.min(100, Math.round((typedText.length / targetText.length) * 100));
+  }, [typedText.length, targetText.length]);
+  const totalWords = useMemo(() => targetText.split(' ').filter(Boolean).length, [targetText]);
+  const typedWords = useMemo(() => typedText.split(' ').filter(Boolean).length, [typedText]);
+
   // Calculate current Ghost Index based on elapsed time and PB timestamps
   const ghostIndex = useMemo((): number => {
     if (!startTime || isPaused || workoutCompleted || timedEndModalOpen) return -1;
@@ -3700,7 +3719,7 @@ export default function App() {
   const scrollModeStripBy = useCallback((direction: -1 | 1) => {
     const el = modeStripRef.current;
     if (!el) return;
-    el.scrollBy({ left: direction * Math.max(160, el.clientWidth * 0.6), behavior: 'smooth' });
+    el.scrollBy({ left: direction * Math.max(160, el.clientWidth * 0.6), behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
   }, []);
 
   // Keep the currently active mode/content pill visible, and refresh the
@@ -3709,7 +3728,7 @@ export default function App() {
     const el = modeStripRef.current;
     if (!el) return;
     const active = el.querySelector<HTMLElement>('[data-mode-strip-active="true"]');
-    if (active) active.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+    if (active) active.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
     updateModeStripScroll();
   }, [activeModal, arcadeActive, freestyleMode, zenMode, botRaceActive, adaptiveBossActive, examMode, activeAppMode, testDuration, updateModeStripScroll]);
 
@@ -3738,7 +3757,7 @@ export default function App() {
       />
       {goalToast && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#141419] border-2 border-[#F59E0B] p-4 rounded-[16px] shadow-[0_0_25px_rgba(245,158,11,0.25)] max-w-sm flex items-center gap-3 animate-bounce">
-          <div className="text-2xl">🏆</div>
+          <Trophy className="w-6 h-6 text-amber-400 shrink-0" aria-hidden="true" />
           <p className="text-xs text-white font-mono leading-tight whitespace-pre-line">{goalToast}</p>
         </div>
       )}
@@ -3770,6 +3789,7 @@ export default function App() {
               onClick={() => setChallengeData(null)}
               className="shrink-0 text-zinc-500 hover:text-white text-xs px-1 cursor-pointer"
               title="Dismiss"
+              aria-label="Dismiss challenge banner"
             >✕</button>
           </div>
         </div>
@@ -3822,6 +3842,7 @@ export default function App() {
                 }}
                 className="p-1.5 hover:bg-amber-500/10 rounded-lg text-zinc-400 hover:text-amber-400 transition-all cursor-pointer hidden md:block"
                 title="Collapse Sidebar"
+                aria-label="Collapse sidebar"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -3837,6 +3858,7 @@ export default function App() {
               }}
               className="mx-auto p-2 hover:bg-amber-500/10 rounded-lg text-zinc-400 hover:text-amber-400 transition-all cursor-pointer mt-2 hidden md:block"
               title="Expand Sidebar"
+              aria-label="Expand sidebar"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -3849,7 +3871,7 @@ export default function App() {
             
             {/* CATEGORY 1: DRILLS & PRACTICE */}
             {sidebarExpanded && (
-              <div className="px-4 pt-2 pb-1 text-[9px] font-mono font-black uppercase tracking-widest text-zinc-500 select-none">
+              <div className="px-4 pt-2 pb-1 text-[9px] font-mono font-black uppercase tracking-widest text-zinc-400 select-none">
                 Drills & Practice
               </div>
             )}
@@ -3927,7 +3949,7 @@ export default function App() {
 
             {/* CATEGORY 2: ARCADE & SOCIAL */}
             {sidebarExpanded && (
-              <div className="px-4 pt-3 pb-1 text-[9px] font-mono font-black uppercase tracking-widest text-zinc-500 select-none">
+              <div className="px-4 pt-3 pb-1 text-[9px] font-mono font-black uppercase tracking-widest text-zinc-400 select-none">
                 Arcade & Social
               </div>
             )}
@@ -4037,7 +4059,7 @@ export default function App() {
 
             {/* CATEGORY 3: ANALYTICS & SYSTEM */}
             {sidebarExpanded && (
-              <div className="px-4 pt-3 pb-1 text-[9px] font-mono font-black uppercase tracking-widest text-zinc-500 select-none">
+              <div className="px-4 pt-3 pb-1 text-[9px] font-mono font-black uppercase tracking-widest text-zinc-400 select-none">
                 Analytics & System
               </div>
             )}
@@ -4158,6 +4180,7 @@ export default function App() {
                   }}
                   className="lg:hidden w-8 h-8 shrink-0 rounded-xl border border-zinc-800 text-zinc-400 hover:text-amber-400 hover:border-amber-500/40 hover:bg-amber-500/10 transition-all cursor-pointer flex items-center justify-center active:scale-95 shadow-sm"
                   title="Menu"
+                  aria-label="Open navigation menu"
                 >
                   <Menu className="w-4 h-4" />
                 </button>
@@ -4190,13 +4213,13 @@ export default function App() {
                   {/* Accuracy: Green Success Color */}
                   <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-xl text-emerald-400 font-bold shadow-[0_0_10px_rgba(74,222,128,0.1)]">
                     <Target className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{liveAccuracy}% ACC</span>
+                    <span>{hasStarted ? `${liveAccuracy}% ACC` : '— ACC'}</span>
                   </div>
 
                   {/* WPM Speed: Green Success Color */}
                   <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-xl text-emerald-400 font-bold shadow-[0_0_10px_rgba(74,222,128,0.1)]">
                     <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{liveWpm} WPM</span>
+                    <span>{hasStarted ? `${liveWpm} WPM` : '— WPM'}</span>
                   </div>
 
                   {/* Secondary Stats (Streak, Timer): Clean, elegant 75% opacity */}
@@ -4232,7 +4255,9 @@ export default function App() {
                   onClick={openWeeklyChallenge}
                   className="px-3.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-400 transition-all cursor-pointer flex items-center justify-center gap-1.5 font-mono font-bold text-xs shadow-[0_0_12px_rgba(245,158,11,0.15)] active:scale-95"
                   title="Weekly Challenge Competition"
+                  aria-label="Weekly Challenge Competition"
                 >
+                  <Trophy className="w-4 h-4 sm:hidden" />
                   <span className="hidden sm:inline">Challenge</span>
                 </button>
 
@@ -4249,49 +4274,77 @@ export default function App() {
                   <span>{sidebarCollapsed ? "Telemetry ◀" : "Focus ▶"}</span>
                 </button>
 
-                {/* Share Button */}
-                <div className="relative">
+                {/* Utility actions — inline on sm+, collapsed into an overflow menu on phones */}
+                <div className="hidden sm:flex items-center gap-2">
+                  {/* Share Button */}
+                  <div className="relative">
+                    <button
+                      onClick={handleShare}
+                      className="w-8 h-8 rounded-xl text-[#8899AA] hover:text-[#00FF88] hover:bg-[#00FF88]/10 border border-zinc-800 transition-all cursor-pointer flex items-center justify-center text-sm shadow-sm active:scale-95"
+                      title="Share Performance"
+                      aria-label="Share performance"
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </button>
+                    {shareFeedback && (
+                      <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-[#00FF88] text-[#0D0F1A] text-[9px] font-mono font-extrabold rounded shadow-md z-50 whitespace-nowrap">
+                        {shareFeedback}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Sound mute button */}
                   <button
-                    onClick={handleShare}
-                    className="w-8 h-8 rounded-xl text-[#8899AA] hover:text-[#00FF88] hover:bg-[#00FF88]/10 border border-zinc-800 transition-all cursor-pointer flex items-center justify-center text-sm shadow-sm active:scale-95"
-                    title="Share Performance"
+                    onClick={() => {
+                      setSoundEnabled(!soundEnabled);
+                      sfx.playClick();
+                    }}
+                    className="w-8 h-8 rounded-xl text-[#8899AA] hover:text-[#F59E0B] hover:bg-[#F59E0B]/10 border border-zinc-800 transition-all cursor-pointer flex items-center justify-center active:scale-95 shadow-sm"
+                    title={soundEnabled ? "Mute Click Sound" : "Unmute Click Sound"}
+                    aria-label={soundEnabled ? "Mute click sound" : "Unmute click sound"}
                   >
-                    <Share2 className="w-4 h-4" />
+                    {soundEnabled ? <Volume2 className="w-4 h-4 text-[#F59E0B]" /> : <VolumeX className="w-4 h-4 text-[#8899AA]" />}
                   </button>
-                  {shareFeedback && (
-                    <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-[#00FF88] text-[#0D0F1A] text-[9px] font-mono font-extrabold rounded shadow-md z-50 whitespace-nowrap">
-                      {shareFeedback}
-                    </span>
-                  )}
+
+                  {/* Fullscreen button */}
+                  <button
+                    onClick={() => {
+                      toggleFullscreen();
+                      sfx.playClick();
+                    }}
+                    className="w-8 h-8 rounded-xl text-[#8899AA] hover:text-[#F59E0B] transition-all cursor-pointer flex items-center justify-center border border-zinc-800 hover:border-[#F59E0B]/30 hover:bg-[#F59E0B]/10 active:scale-95 shadow-sm"
+                    title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                    aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                  >
+                    {isFullscreen ? (
+                      <Minimize className="w-4 h-4" />
+                    ) : (
+                      <Maximize className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
 
-                {/* Sound mute button */}
-                <button
-                  onClick={() => {
-                    setSoundEnabled(!soundEnabled);
-                    sfx.playClick();
-                  }}
-                  className="w-8 h-8 rounded-xl text-[#8899AA] hover:text-[#F59E0B] hover:bg-[#F59E0B]/10 border border-zinc-800 transition-all cursor-pointer flex items-center justify-center active:scale-95 shadow-sm"
-                  title={soundEnabled ? "Mute Click Sound" : "Unmute Click Sound"}
-                >
-                  {soundEnabled ? <Volume2 className="w-4 h-4 text-[#F59E0B]" /> : <VolumeX className="w-4 h-4 text-[#8899AA]" />}
-                </button>
-
-                {/* Fullscreen button */}
-                <button
-                  onClick={() => {
-                    toggleFullscreen();
-                    sfx.playClick();
-                  }}
-                  className="w-8 h-8 rounded-xl text-[#8899AA] hover:text-[#F59E0B] transition-all cursor-pointer flex items-center justify-center border border-zinc-800 hover:border-[#F59E0B]/30 hover:bg-[#F59E0B]/10 active:scale-95 shadow-sm"
-                  title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-                >
-                  {isFullscreen ? (
-                    <Minimize className="w-4 h-4" />
-                  ) : (
-                    <Maximize className="w-4 h-4" />
-                  )}
-                </button>
+                {/* Phone overflow menu (share / sound / fullscreen) */}
+                <div className="relative sm:hidden">
+                  <button
+                    ref={moreMenuBtnRef}
+                    onClick={() => {
+                      if (!moreMenuOpen && moreMenuBtnRef.current) {
+                        const r = moreMenuBtnRef.current.getBoundingClientRect();
+                        setMoreMenuPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.right - 200, window.innerWidth - 208)) });
+                      }
+                      setMoreMenuOpen(o => !o);
+                      sfx.playClick();
+                    }}
+                    className="w-8 h-8 rounded-xl text-[#8899AA] hover:text-[#F59E0B] hover:border-[#F59E0B]/30 hover:bg-[#F59E0B]/10 border border-zinc-800 transition-all cursor-pointer flex items-center justify-center active:scale-95 shadow-sm"
+                    title="More actions"
+                    aria-label="More actions"
+                    aria-expanded={moreMenuOpen}
+                    aria-haspopup="menu"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -4303,7 +4356,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => { scrollModeStripBy(-1); sfx.playClick(); }}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-6 h-6 flex items-center justify-center rounded-full bg-[#141422]/90 border border-zinc-700/80 text-zinc-300 hover:text-[#F59E0B] hover:border-[#F59E0B]/60 transition-all cursor-pointer shadow-lg"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 touch-manipulation flex items-center justify-center rounded-full bg-[#141422]/95 border border-zinc-700/80 text-zinc-300 hover:text-[#F59E0B] hover:border-[#F59E0B]/60 transition-all cursor-pointer shadow-lg"
                     title="Scroll modes left"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
@@ -4468,7 +4521,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => { scrollModeStripBy(1); sfx.playClick(); }}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-6 h-6 flex items-center justify-center rounded-full bg-[#141422]/90 border border-zinc-700/80 text-zinc-300 hover:text-[#F59E0B] hover:border-[#F59E0B]/60 transition-all cursor-pointer shadow-lg"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 touch-manipulation flex items-center justify-center rounded-full bg-[#141422]/95 border border-zinc-700/80 text-zinc-300 hover:text-[#F59E0B] hover:border-[#F59E0B]/60 transition-all cursor-pointer shadow-lg"
                     title="Scroll modes right"
                   >
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -4615,6 +4668,42 @@ export default function App() {
               </>
             )}
 
+            {/* Phone overflow menu (share / sound / fullscreen) */}
+            {moreMenuOpen && moreMenuPos && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => { setMoreMenuOpen(false); sfx.playClick(); }} />
+                <div
+                  className="fixed z-50 w-48 bg-[#0C0E18] border border-zinc-800 rounded-2xl p-1.5 shadow-2xl shadow-black/60"
+                  style={{ top: moreMenuPos.top, left: moreMenuPos.left }}
+                  role="menu"
+                >
+                  <button
+                    onClick={() => { setMoreMenuOpen(false); handleShare(); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-mono text-zinc-300 hover:bg-zinc-800/50 hover:text-white transition-all cursor-pointer"
+                    role="menuitem"
+                  >
+                    <Share2 className="w-3.5 h-3.5" /> Share performance
+                  </button>
+                  <button
+                    onClick={() => { setMoreMenuOpen(false); setSoundEnabled(!soundEnabled); sfx.playClick(); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-mono text-zinc-300 hover:bg-zinc-800/50 hover:text-white transition-all cursor-pointer"
+                    role="menuitem"
+                  >
+                    {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-[#F59E0B]" /> : <VolumeX className="w-3.5 h-3.5" />}
+                    {soundEnabled ? 'Mute sound' : 'Unmute sound'}
+                  </button>
+                  <button
+                    onClick={() => { setMoreMenuOpen(false); toggleFullscreen(); sfx.playClick(); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-mono text-zinc-300 hover:bg-zinc-800/50 hover:text-white transition-all cursor-pointer"
+                    role="menuitem"
+                  >
+                    {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+                    {isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                  </button>
+                </div>
+              </>
+            )}
+
             {/* Fix #3 — Story Info Stats Row (Plain text separated by simple dividers ·, no colored background pills) */}
             {!arcadeActive && (
               <div className="w-full bg-[#11131E] border border-zinc-800/60 px-3.5 py-1.5 rounded-xl flex items-center justify-between gap-3 text-xs font-mono select-none mb-2 shrink-0">
@@ -4628,9 +4717,9 @@ export default function App() {
                 <div className="flex flex-row flex-wrap items-center gap-2 text-[11px] text-zinc-400">
                   {/* Live WPM + ACC (small screens only — topbar pills hide below lg) */}
                   <span className="lg:hidden text-zinc-700">·</span>
-                  <span className="lg:hidden text-[#F59E0B] font-bold flex items-center gap-1"><Zap className="w-3 h-3" /> {liveWpm} WPM</span>
+                  <span className="lg:hidden text-[#F59E0B] font-bold flex items-center gap-1"><Zap className="w-3 h-3" /> {hasStarted ? `${liveWpm} WPM` : '— WPM'}</span>
                   <span className="lg:hidden text-zinc-700">·</span>
-                  <span className="lg:hidden text-emerald-400 font-bold flex items-center gap-1"><Target className="w-3 h-3" /> {liveAccuracy}% ACC</span>
+                  <span className="lg:hidden text-emerald-400 font-bold flex items-center gap-1"><Target className="w-3 h-3" /> {hasStarted ? `${liveAccuracy}% ACC` : '— ACC'}</span>
 
                   {/* Benchmark */}
                   <span className="text-zinc-700">·</span>
@@ -4743,7 +4832,7 @@ export default function App() {
                     <div className="grid grid-cols-2 gap-4 w-full">
                       {/* WPM Card */}
                       <div className="bg-[#141A26]/80 border border-[#F59E0B]/30 px-4 py-5 rounded-xl text-center shadow-[0_0_15px_rgba(245,158,11,0.1)]">
-                        <span className="text-[10px] font-mono text-zinc-500 block uppercase font-bold">Final WPM</span>
+                        <span className="text-[10px] font-mono text-zinc-400 block uppercase font-bold">Final WPM</span>
                         <span className="text-4xl font-mono font-black text-[#F59E0B] block mt-1">
                           {timedResult ? timedResult.wpm : (testDuration ? Math.round((typedText.length / 5) / (testDuration / 60)) : 0)}
                         </span>
@@ -4751,7 +4840,7 @@ export default function App() {
 
                       {/* Accuracy Card */}
                       <div className="bg-[#141A26]/80 border border-[#F59E0B]/30 px-4 py-5 rounded-xl text-center shadow-[0_0_15px_rgba(245,158,11,0.1)]">
-                        <span className="text-[10px] font-mono text-zinc-500 block uppercase font-bold">Accuracy</span>
+                        <span className="text-[10px] font-mono text-zinc-400 block uppercase font-bold">Accuracy</span>
                         <span className="text-4xl font-mono font-black text-[#F59E0B] block mt-1">
                           {timedResult ? `${timedResult.accuracy}%` : (() => {
                             let correctsCount = 0;
@@ -4826,13 +4915,13 @@ export default function App() {
 
                   <div className="grid grid-cols-2 gap-4 w-full my-2">
                     <div className="bg-[#141419] p-4 rounded-[12px] border border-zinc-850 text-center shadow-inner">
-                      <span className="text-[10px] font-mono text-zinc-500 block uppercase">TYPING SPEED</span>
+                      <span className="text-[10px] font-mono text-zinc-400 block uppercase">TYPING SPEED</span>
                       <span className="text-2xl font-mono font-black text-[#FFB800] block mt-1">
                         {workoutStats?.wpm} <span className="text-xs font-normal text-zinc-500">WPM</span>
                       </span>
                     </div>
                     <div className="bg-[#141419] p-4 rounded-[12px] border border-zinc-850 text-center shadow-inner">
-                      <span className="text-[10px] font-mono text-zinc-500 block uppercase">ACCURACY</span>
+                      <span className="text-[10px] font-mono text-zinc-400 block uppercase">ACCURACY</span>
                       <span className="text-2xl font-mono font-black text-white block mt-1">
                         {workoutStats?.accuracy}%
                       </span>
@@ -4886,18 +4975,37 @@ export default function App() {
 
                   {/* Visual Progress Bar with Gold Accent */}
                   <div className="w-full mb-2.5 select-none shrink-0">
-                    <div className="flex justify-between items-center text-[9px] font-mono mb-1">
-                      <span className="tracking-wider uppercase font-bold text-zinc-400">Progress</span>
-                      <span className="text-[#F59E0B] font-black">
-                        {targetText.length > 0 ? Math.min(100, Math.round((typedText.length / targetText.length) * 100)) : 0}%
-                        {' · '}
-                        {typedText.split(' ').filter(Boolean).length} / {targetText.split(' ').filter(Boolean).length} words
-                      </span>
+                    <div className="flex justify-between items-center text-[10px] font-mono mb-1.5">
+                      <span className="tracking-wider uppercase font-bold text-zinc-300">Progress</span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-1.5 py-0.5 rounded-md border font-bold ${
+                            !hasStarted
+                              ? 'text-zinc-400 border-zinc-700'
+                              : liveWpm >= speedTarget
+                              ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
+                              : 'text-amber-400 border-amber-500/40 bg-amber-500/10'
+                          }`}
+                          title="Your live speed vs. the target benchmark"
+                        >
+                          {hasStarted ? liveWpm : '—'} / {speedTarget} WPM
+                        </span>
+                        <span className="text-[#F59E0B] font-black">
+                          {progressPct}% · {typedWords} / {totalWords} words
+                        </span>
+                      </div>
                     </div>
-                    <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
+                    <div
+                      className="w-full h-2.5 bg-zinc-900 rounded-full overflow-hidden border border-zinc-700/70"
+                      role="progressbar"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={progressPct}
+                      aria-label="Lesson progress"
+                    >
                       <div
-                        className="h-full bg-[#F59E0B] transition-all duration-300 rounded-full"
-                        style={{ width: `${targetText.length > 0 ? Math.min(100, Math.round((typedText.length / targetText.length) * 100)) : 0}%` }}
+                        className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.5)] transition-all duration-300"
+                        style={{ width: `${progressPct}%` }}
                       />
                     </div>
                   </div>
@@ -4958,7 +5066,7 @@ export default function App() {
 
             {/* Tablet on-screen keyboard (hidden on large desktops that use physical keys) */}
             {keyboardVisibleOnMobile && !arcadeActive && (
-              <div className="xl:hidden w-full shrink-0 flex flex-col items-center gap-2 pt-1 pb-2">
+              <div className="order-2 lg:order-none xl:hidden w-full shrink-0 flex flex-col items-center gap-2 pt-1 pb-2">
                 <div className="w-full flex items-center justify-between select-none font-mono" style={{ fontSize: '11px' }}>
                   <button
                     onClick={() => {
@@ -4969,7 +5077,7 @@ export default function App() {
                     className="px-2.5 py-1 rounded-lg border border-zinc-800 bg-[#0B0C10]/60 hover:bg-zinc-850 text-[11px] font-mono uppercase tracking-wider cursor-pointer flex items-center gap-1 group select-none transition-all hover:border-[#F59E0B]/30 hover:text-white"
                     title="Click to cycle layout (QWERTY -> DVORAK -> COLEMAK)"
                   >
-                    <span className="text-zinc-500">LAYOUT:</span>
+                    <span className="text-zinc-400">LAYOUT:</span>
                     <span className="text-[#F59E0B] font-black group-hover:animate-pulse">{keyboardLayout}</span>
                   </button>
                   <button
@@ -4998,7 +5106,7 @@ export default function App() {
             )}
 
             {/* Bottom Controls — Large, High-Contrast Gold Accent Buttons */}
-            <div className="w-full shrink-0 flex items-center justify-start gap-3 pt-2">
+            <div className="order-1 lg:order-none w-full shrink-0 flex flex-wrap items-center justify-start gap-2.5 sm:gap-3 pt-2">
               {!workoutCompleted && !arcadeActive && (
                 <>
                   <button
@@ -5053,6 +5161,7 @@ export default function App() {
                 onScriptToggle={handleScriptToggle}
                 liveWpm={liveWpm}
                 liveAccuracy={liveAccuracy}
+                hasStarted={hasStarted}
                 errorCount={fumbles ? Object.values(fumbles as Record<string, number>).reduce((a: number, b: number) => a + b, 0) : 0}
                 streak={streak}
                 xp={userXp}
@@ -5313,7 +5422,7 @@ export default function App() {
                     {soundEnabled ? 'Sound On' : 'Sound Off'}
                   </span>
                 </button>
-                <div className="text-center text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                <div className="text-center text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
                   Ribbon Engine v2.0
                 </div>
               </div>
@@ -5352,9 +5461,9 @@ export default function App() {
                   {activeModal === 'calendar' && "Activity Calendar"}
                   {activeModal === 'achievements' && "Achievements & Milestones"}
                   {activeModal === 'friends' && "Friends & Follow Social Feed"}
-                  {activeModal === 'themes' && "🎨 Themes & Custom Color Schemes"}
-                  {activeModal === 'history' && "📊 Full Session History Analytics"}
-                  {activeModal === 'goals' && "🎯 Daily Habits & Practice Goals"}
+                  {activeModal === 'themes' && "Themes & Custom Color Schemes"}
+                  {activeModal === 'history' && "Full Session History Analytics"}
+                  {activeModal === 'goals' && "Daily Habits & Practice Goals"}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
@@ -5365,6 +5474,8 @@ export default function App() {
                     sfx.playClick();
                   }}
                   className="p-1.5 hover:bg-amber-500/10 hover:border-amber-500/30 border border-transparent rounded-xl text-zinc-400 hover:text-amber-400 transition-all cursor-pointer"
+                  aria-label="Close dialog"
+                  title="Close"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -5404,7 +5515,7 @@ export default function App() {
                       className="px-4 py-2 bg-amber-400 hover:bg-amber-300 disabled:opacity-50 text-zinc-950 font-black text-xs font-mono rounded-xl transition-all shadow-[0_0_12px_rgba(245,158,11,0.2)] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>{smartDrillGenerating ? "Generating..." : "⚡ Generate Drill"}</span>
+                      <span>{smartDrillGenerating ? "Generating..." : "Generate Drill"}</span>
                     </button>
                   </div>
 
@@ -5412,33 +5523,33 @@ export default function App() {
                   <div className="flex gap-2 p-1 bg-[#121422] border border-zinc-800/80 rounded-xl font-mono text-xs select-none">
                     <button
                       onClick={() => setLessonCategoryTab('basics')}
-                      className={`flex-1 py-2 px-3 rounded-lg font-bold transition-all cursor-pointer ${
+                      className={`flex-1 py-2 px-3 rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         lessonCategoryTab === 'basics'
                           ? 'bg-amber-400 text-zinc-950 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
                           : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                       }`}
                     >
-                      📖 Basics ({currentScript === 'hindi' ? 'हिंदी' : 'English'})
+                      <Keyboard className="w-3.5 h-3.5" /> Basics ({currentScript === 'hindi' ? 'हिंदी' : 'English'})
                     </button>
                     <button
                       onClick={() => setLessonCategoryTab('stories')}
-                      className={`flex-1 py-2 px-3 rounded-lg font-bold transition-all cursor-pointer ${
+                      className={`flex-1 py-2 px-3 rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         lessonCategoryTab === 'stories'
                           ? 'bg-amber-400 text-zinc-950 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
                           : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                       }`}
                     >
-                      📚 Stories
+                      <BookOpen className="w-3.5 h-3.5" /> Stories
                     </button>
                     <button
                       onClick={() => setLessonCategoryTab('exams')}
-                      className={`flex-1 py-2 px-3 rounded-lg font-bold transition-all cursor-pointer ${
+                      className={`flex-1 py-2 px-3 rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         lessonCategoryTab === 'exams'
                           ? 'bg-amber-400 text-zinc-950 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
                           : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                       }`}
                     >
-                      🏛️ Civil Exams
+                      <GraduationCap className="w-3.5 h-3.5" /> Civil Exams
                     </button>
                   </div>
 
@@ -5795,7 +5906,7 @@ export default function App() {
                           className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:opacity-50 text-zinc-950 font-black text-xs font-mono rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
-                          <span>{smartDrillGenerating ? "Generating Custom Drill..." : "⚡ Generate AI Weakness Drill"}</span>
+                          <span>{smartDrillGenerating ? "Generating Custom Drill..." : "Generate AI Weakness Drill"}</span>
                         </button>
                       </div>
 
@@ -7451,7 +7562,7 @@ export default function App() {
                 {weeklyChallengeLoading ? (
                   <div className="py-12 flex flex-col items-center justify-center gap-2">
                     <div className="w-8 h-8 rounded-full border-4 border-[#F59E0B]/20 border-t-[#F59E0B] animate-spin" />
-                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Generating story via Gemini...</span>
+                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Generating story via Gemini...</span>
                   </div>
                 ) : weeklyChallengeStory ? (
                   <>
