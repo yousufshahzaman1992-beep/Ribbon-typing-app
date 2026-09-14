@@ -14,6 +14,7 @@ import {
 } from "./src/lib/leaderboard";
 import { buildScorecardSvg } from "./src/lib/ogCard";
 import { parseChallengeQuery } from "./src/lib/challenge";
+import { renderAppShell } from "./src/lib/appShell";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 dotenv.config();
@@ -28,77 +29,8 @@ app.use(express.json());
 // The static landing page (full long-tail SEO copy) lives at "/". The React
 // typing coach hydrates only on "/app". Legacy "beat my score" challenge links
 // pointed at "/?challenge=...", so keep forwarding those to the new coach URL.
+// Shared head/shell logic lives in ./src/lib/appShell (also used by Netlify).
 // ─────────────────────────────────────────────────────────────────────────────
-const SITE_BASE = "https://ribbon-typing-app.netlify.app";
-
-function setHeadMeta(html: string, overrides: Record<string, string | boolean>) {
-  if (typeof overrides.title === "string") {
-    html = html.replace(/<title>[^<]*<\/title>/, `<title>${overrides.title}</title>`);
-  }
-  if (typeof overrides.description === "string") {
-    html = html.replace(
-      /<meta name="description" content="[^"]*" \/>/,
-      `<meta name="description" content="${overrides.description}" />`,
-    );
-  }
-  if (typeof overrides.canonical === "string") {
-    html = html.replace(
-      /<link rel="canonical" href="[^"]*" \/>/,
-      `<link rel="canonical" href="${SITE_BASE}${overrides.canonical}" />`,
-    );
-  }
-  if (overrides.noindex === true) {
-    html = html.replace(
-      /<meta name="robots" content="index, follow" \/>/,
-      '<meta name="robots" content="noindex, follow" />',
-    );
-  }
-  const ogProps: Array<[string, string]> = [
-    ["og:title", "ogTitle"],
-    ["og:description", "ogDescription"],
-    ["og:url", "ogUrl"],
-  ];
-  for (const [prop, key] of ogProps) {
-    if (typeof overrides[key] === "string") {
-      const value = prop === "og:url" ? `${SITE_BASE}${overrides[key]}` : overrides[key] as string;
-      html = html.replace(
-        new RegExp(`<meta property="${prop}" content="[^"]*" \\/>`),
-        `<meta property="${prop}" content="${value}" />`,
-      );
-    }
-  }
-  const twitterProps: Array<[string, string]> = [
-    ["twitter:title", "ogTitle"],
-    ["twitter:description", "ogDescription"],
-  ];
-  for (const [prop, key] of twitterProps) {
-    if (typeof overrides[key] === "string") {
-      html = html.replace(
-        new RegExp(`<meta name="${prop}" content="[^"]*" \\/>`),
-        `<meta name="${prop}" content="${overrides[key] as string}" />`,
-      );
-    }
-  }
-  return html;
-}
-
-function renderAppShell(landingHtml: string): string {
-  // The coach hydrates into #root and React replaces the markup on first render.
-  // Head-level differences are what matter for SEO/social: unique short meta,
-  // canonical "/app", noindex (thin JS shell), and no duplicated structured data.
-  let html = landingHtml.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, "");
-  return setHeadMeta(html, {
-    title: "Typing Coach — Practice & Beat Your WPM | Ribbon",
-    description:
-      "Open the Ribbon typing coach: timed WPM and accuracy tests, English and Hindi lessons, JavaScript code practice, bot races, arcade games and the weekly leaderboard — all free and with no sign-up.",
-    canonical: "/app",
-    ogTitle: "Ribbon Typing Coach — Free WPM & Accuracy Practice",
-    ogDescription:
-      "Free timed WPM tests, English & Hindi lessons, JavaScript code practice, bot races, arcade games and a weekly leaderboard. No sign-up.",
-    ogUrl: "/app",
-    noindex: true,
-  });
-}
 
 function injectScoreCardMeta(html: string, parsed: { name: string; wpm: number; acc: number; minutes: number }, origin: string) {
   const cardUrl = `${origin}/api/og-card?name=${encodeURIComponent(parsed.name)}&wpm=${parsed.wpm}&acc=${parsed.acc}&minutes=${parsed.minutes}`;
@@ -531,13 +463,20 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     const indexFile = path.join(distPath, "index.html");
+    const notFoundFile = path.join(distPath, "404.html");
     let landingHtml = "";
     let appShellHtml = "";
+    let notFoundHtml = "";
     try {
       landingHtml = fs.readFileSync(indexFile, "utf8");
       appShellHtml = renderAppShell(landingHtml);
     } catch (e) {
       console.error("[Server] Failed to read dist/index.html:", e);
+    }
+    try {
+      notFoundHtml = fs.readFileSync(notFoundFile, "utf8");
+    } catch {
+      notFoundHtml = "";
     }
 
     // Static landing page with the full SEO copy ("/" is not hydrated by React)
@@ -562,8 +501,10 @@ async function startServer() {
 
     // Anything that is not a real file or one of the known routes is a 404. The
     // landing page is intentionally NOT served for arbitrary paths, so we don't
-    // create thousands of near-duplicate indexable URLs.
+    // create thousands of near-duplicate indexable URLs. Serve the same custom
+    // 404 page Netlify uses so both hosts behave identically.
     app.use((_req, res) => {
+      if (notFoundHtml) return res.status(404).type("html").send(notFoundHtml);
       res.status(404).send("Not found");
     });
   }

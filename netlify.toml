@@ -2,7 +2,17 @@
   command = "npm run build"
   publish = "dist"
 
-# Rewrite /api/* routes to serverless functions (preserving HTTP method).
+# NOTE ON ROUTING
+# ---------------
+# Known routes are matched explicitly below. Because these redirects are not
+# "force" rules, real static files always win, which serves:
+#   /             -> /index.html        (static, fully rendered landing page)
+#   /privacy.html -> /privacy.html      (static)
+#   /404.html     -> /404.html          (static, custom not-found page)
+# Everything that is not a known route falls through to the final rule and gets
+# an actual HTTP 404 instead of silently returning the homepage with a 200.
+
+# ── API routes: rewrite /api/* to serverless functions (preserve HTTP method) ──
 [[redirects]]
   from = "/api/leaderboard"
   to = "/.netlify/functions/leaderboard"
@@ -21,7 +31,25 @@
   status = 200
   force = true
 
-# Challenge share URLs get server-rendered social meta tags for rich previews.
+[[redirects]]
+  from = "/api/generate-story"
+  to = "/.netlify/functions/generate-story"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/generate-drill"
+  to = "/.netlify/functions/generate-drill"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/generate-smart-drill"
+  to = "/.netlify/functions/generate-smart-drill"
+  status = 200
+  force = true
+
+# ── Challenge share URLs get server-rendered social meta tags ─────────────────
 [[redirects]]
   from = "/*"
   query = { challenge = ":challenge" }
@@ -29,8 +57,21 @@
   status = 200
   force = true
 
-# SPA fallback so client-side routing keeps working.
+# ── React typing coach: only /app is client-rendered. Serve it through the
+#    app-shell function so it gets the same unique title, description,
+#    canonical "/app" and noindex the Express server produces for /app. ───────
+[[redirects]]
+  from = "/app"
+  to = "/.netlify/functions/app-shell"
+  status = 200
+
+[[redirects]]
+  from = "/app/*"
+  to = "/.netlify/functions/app-shell"
+  status = 200
+
+# ── Anything not matched above is a genuine 404 ──────────────────────────────
 [[redirects]]
   from = "/*"
-  to = "/index.html"
-  status = 200
+  to = "/404.html"
+  status = 404
