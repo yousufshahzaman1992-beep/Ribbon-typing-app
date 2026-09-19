@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, useTransition, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, useTransition, lazy, Suspense } from 'react';
 import { TypingText } from './components/TypingText';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -1500,7 +1500,7 @@ export default function App() {
 
   // Scrolling refs for typing area
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const activeCharRef = useRef<HTMLSpanElement | null>(null);
+  const caretRef = useRef<HTMLDivElement | null>(null);
   const isAppendingRef = useRef<boolean>(false);
   // AI story auto-append: tracks whether a background prefetch is already in flight
   const aiPrefetchInFlightRef = useRef<boolean>(false);
@@ -1513,6 +1513,36 @@ export default function App() {
     }
     return document.querySelector('.typing-area') as HTMLDivElement | null;
   };
+
+  // Resolve the character element that is currently the typing cursor. We read it
+  // straight from the DOM (the painted source of truth) instead of a conditional
+  // ref, which can go stale and leave the caret stuck on an already-typed char.
+  const getActiveCharEl = (): HTMLSpanElement | null => {
+    const container = getActiveContainer();
+    return container ? container.querySelector<HTMLSpanElement>('[data-active-char="true"]') : null;
+  };
+
+  // Synchronous caret overlay positioning. Called from a layout effect on every
+  // render so the caret is placed before the browser paints — it can never lag
+  // behind a keystroke the way a throttled rAF/timer chain does.
+  const positionCaret = useCallback(() => {
+    const caret = caretRef.current;
+    const container = getActiveContainer();
+    const activeChar = getActiveCharEl();
+    if (!caret) return;
+    if (!container || !activeChar) {
+      caret.style.display = 'none';
+      return;
+    }
+    const charRect = activeChar.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const charAbsoluteTop = container.scrollTop + (charRect.top - containerRect.top);
+    caret.style.display = 'block';
+    caret.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
+    caret.style.top = `${charAbsoluteTop}px`;
+    caret.style.width = `${charRect.width}px`;
+    caret.style.height = `${charRect.height}px`;
+  }, []);
 
   // Arcade mini-game states (Ribbon Invaders played in upper text area container)
   const [arcadeActive, setArcadeActive] = useState<boolean>(false);
@@ -1706,7 +1736,7 @@ export default function App() {
 
       measureRafIdRef.current = requestAnimationFrame(() => {
         const container = getActiveContainer();
-        const activeChar = activeCharRef.current;
+        const activeChar = getActiveCharEl();
 
         if (activeChar && container) {
           const charRect = activeChar.getBoundingClientRect();
@@ -1718,32 +1748,12 @@ export default function App() {
             charAbsoluteTop - Math.floor(container.clientHeight * 0.15),
             container.scrollHeight - container.clientHeight
           ));
-          // Caret overlay (read before writing scrollTop)
-          const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
-          carets.forEach(caret => {
-            caret.style.display = 'block';
-            caret.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
-            caret.style.top = `${charAbsoluteTop}px`;
-            caret.style.width = `${charRect.width}px`;
-            caret.style.height = `${charRect.height}px`;
-          });
-          const suggestions = document.querySelectorAll('.custom-suggestion') as NodeListOf<HTMLDivElement>;
-          suggestions.forEach(sug => {
-            sug.style.display = 'flex';
-            sug.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
-            sug.style.top = `${charAbsoluteTop - 24}px`;
-          });
           writeRafIdRef.current = requestAnimationFrame(() => {
             // scrollTo with behavior:'instant' bypasses CSS scroll-behavior:smooth
             // so the scroll snaps immediately rather than animating and being
             // interrupted by the next keystroke (which caused the tiny-fraction bug)
             container.scrollTo({ top: targetScroll, behavior: 'instant' });
           });
-        } else {
-          const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
-          carets.forEach(caret => { caret.style.display = 'none'; });
-          const suggestions = document.querySelectorAll('.custom-suggestion') as NodeListOf<HTMLDivElement>;
-          suggestions.forEach(sug => { sug.style.display = 'none'; });
         }
       });
     };
@@ -1771,17 +1781,32 @@ export default function App() {
   // Persistent resize listener (registered only once on mount)
   useEffect(() => {
     const handleResize = () => {
+      positionCaret();
       requestAnimationFrame(() => {
         if (performScrollRef.current) performScrollRef.current();
       });
     };
     window.addEventListener('resize', handleResize);
+    // Web fonts can change glyph metrics after first paint — reposition once loaded
+    let cancelled = false;
+    const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
+    if (fonts?.ready) {
+      fonts.ready.then(() => { if (!cancelled) positionCaret(); }).catch(() => { });
+    }
     return () => {
+      cancelled = true;
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [positionCaret]);
 
-  // Sync scroll positioning based on active char and update cursor coordinates
+  // Place the caret overlay synchronously before paint on every render. This runs
+  // after the new DOM has been committed, so the caret always matches the true
+  // current character — no throttling, no rAF lag.
+  useLayoutEffect(() => {
+    positionCaret();
+  });
+
+  // Sync scroll positioning based on active char (throttled — scroll only)
   useEffect(() => {
     let initRafId = requestAnimationFrame(() => {
       performScroll();
@@ -1803,7 +1828,7 @@ export default function App() {
       timeoutId = setTimeout(() => {
         rafId = requestAnimationFrame(() => {
           const container = getActiveContainer();
-          const activeChar = activeCharRef.current;
+          const activeChar = getActiveCharEl();
           if (activeChar && container) {
             const charRect = activeChar.getBoundingClientRect();
             const containerRect = container.getBoundingClientRect();
@@ -1813,21 +1838,8 @@ export default function App() {
               container.scrollHeight - container.clientHeight
             ));
             container.scrollTo({ top: targetScroll, behavior: 'instant' });
-            const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
-            carets.forEach(caret => {
-              caret.style.display = 'block';
-              caret.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
-              caret.style.top = `${charAbsoluteTop}px`;
-              caret.style.width = `${charRect.width}px`;
-              caret.style.height = `${charRect.height}px`;
-            });
-            const suggestions = document.querySelectorAll('.custom-suggestion') as NodeListOf<HTMLDivElement>;
-            suggestions.forEach(sug => {
-              sug.style.display = 'flex';
-              sug.style.left = `${charRect.left - containerRect.left + container.scrollLeft}px`;
-              sug.style.top = `${charAbsoluteTop - 24}px`;
-            });
           }
+          positionCaret();
         });
       }, 60);
     };
@@ -1838,7 +1850,7 @@ export default function App() {
       if (timeoutId) clearTimeout(timeoutId);
       if (rafId !== null) cancelAnimationFrame(rafId);
     };
-  }, [targetText]);
+  }, [targetText, positionCaret]);
 
   // Sync sound settings to class
   useEffect(() => {
@@ -3021,14 +3033,7 @@ export default function App() {
       mistypedNewlineIndices: new Set(),
       autoInsertedBrackets: []
     }));
-    const carets = document.querySelectorAll('.custom-caret') as NodeListOf<HTMLDivElement>;
-    carets.forEach(caret => {
-      caret.style.display = 'none';
-    });
-    const suggestions = document.querySelectorAll('.custom-suggestion') as NodeListOf<HTMLDivElement>;
-    suggestions.forEach(sug => {
-      sug.style.display = 'none';
-    });
+    if (caretRef.current) caretRef.current.style.display = 'none';
     setStartTime(null);
     setElapsed(0);
     setWorkoutCompleted(false);
@@ -5018,7 +5023,7 @@ export default function App() {
                       <div className="w-full text-left font-mono text-[18px] md:text-[20px] lg:text-[21px] leading-[1.8] tracking-wide text-[#45A29E] flex flex-wrap gap-y-1">
                         <span className="break-all whitespace-pre-wrap">{typedText}</span>
                         <span
-                          ref={activeCharRef}
+                          data-active-char="true"
                           className="text-[#F59E0B] font-black scale-110 relative z-10 transition-transform animate-pulse border-b-2 border-[#F59E0B] inline-block min-w-[12px] h-[28px] text-center"
                           style={{ textShadow: "0 0 10px #F59E0B, 0 0 20px #F59E0B" }}
                         >
@@ -5041,7 +5046,6 @@ export default function App() {
                           activeAppMode={activeAppMode}
                           punishedTokenIndex={punishedTokenIndex}
                           parsedParagraphs={parsedParagraphs}
-                          activeCharRef={activeCharRef}
                           mistypedNewlineIndices={mistypedNewlineIndices}
                           autoInsertedBrackets={autoInsertedBrackets}
                           ghostIndex={ghostIndex}
@@ -5053,6 +5057,7 @@ export default function App() {
                     )}
 
                     <div
+                      ref={caretRef}
                       className="custom-caret absolute bg-[#F59E0B]/25 border-b-2 border-[#F59E0B] pointer-events-none select-none animate-pulse hidden"
                       style={{
                         boxShadow: "0 0 10px rgba(245, 158, 11, 0.5)",

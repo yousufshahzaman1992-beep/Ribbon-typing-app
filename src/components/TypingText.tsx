@@ -26,7 +26,6 @@ interface TypingTextProps {
   activeAppMode: string;
   punishedTokenIndex: number | null;
   parsedParagraphs: { lines: string[] }[];
-  activeCharRef: React.RefObject<HTMLSpanElement | null>;
   mistypedNewlineIndices: Set<number>;
   autoInsertedBrackets: number[];
   ghostIndex: number;
@@ -100,7 +99,6 @@ interface CharSpanProps {
   isOpponentTyped: boolean;
   isPunished: boolean;
   zenMode: boolean;
-  activeCharRef: React.RefObject<HTMLSpanElement | null>;
 }
 
 const CharSpanComponent: React.FC<CharSpanProps> = ({
@@ -118,7 +116,6 @@ const CharSpanComponent: React.FC<CharSpanProps> = ({
   isOpponentTyped,
   isPunished,
   zenMode,
-  activeCharRef,
 }) => {
   const char = segment.text;
   const isWhitespace = /^\s$/.test(char);
@@ -184,7 +181,7 @@ const CharSpanComponent: React.FC<CharSpanProps> = ({
 
   return (
     <span 
-      ref={isActive ? activeCharRef : null}
+      data-active-char={isActive || undefined}
       className={charClass}
       style={charStyle}
       data-ghost={isGhost || undefined}
@@ -223,7 +220,6 @@ const TypingTextComponent: React.FC<TypingTextProps> = ({
   activeAppMode,
   punishedTokenIndex,
   parsedParagraphs,
-  activeCharRef,
   mistypedNewlineIndices,
   autoInsertedBrackets,
   ghostIndex,
@@ -481,7 +477,6 @@ const TypingTextComponent: React.FC<TypingTextProps> = ({
                           isOpponentTyped={isOpponentTyped}
                           isPunished={isPunished}
                           zenMode={zenMode}
-                          activeCharRef={activeCharRef}
                         />
                       );
                     })}
@@ -525,7 +520,6 @@ const TypingTextComponent: React.FC<TypingTextProps> = ({
                       isOpponentTyped={isOpponentTyped}
                       isPunished={isPunished}
                       zenMode={zenMode}
-                      activeCharRef={activeCharRef}
                     />
                   );
                 });
