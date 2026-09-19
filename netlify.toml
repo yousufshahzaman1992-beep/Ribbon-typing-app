@@ -49,6 +49,12 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/api/weekly-challenge"
+  to = "/.netlify/functions/weekly-challenge"
+  status = 200
+  force = true
+
 # ── Challenge share URLs get server-rendered social meta tags ─────────────────
 [[redirects]]
   from = "/*"
