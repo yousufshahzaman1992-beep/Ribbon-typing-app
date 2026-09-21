@@ -497,6 +497,22 @@ async function startServer() {
       res.send(html);
     });
 
+    // Static SEO guide pages live in dist/<slug>/index.html. Serve each at its
+    // extensionless canonical URL (the same URL declared in its <link rel="
+    // canonical"> and in sitemap.xml) with a 200, instead of letting
+    // express.static 301 to a trailing-slash variant.
+    const seoPages = [
+      "ad-free-typing-test",
+      "typing-practice-for-beginners",
+      "offline-typing-test",
+      "typing-games",
+    ];
+    for (const slug of seoPages) {
+      app.get(`/${slug}`, (_req, res) => {
+        res.sendFile(path.join(distPath, slug, "index.html"));
+      });
+    }
+
     app.use(express.static(distPath));
 
     // Anything that is not a real file or one of the known routes is a 404. The

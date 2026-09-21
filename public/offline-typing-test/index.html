@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offline Typing Test — Installable PWA That Works Without Internet | Ribbon</title>
+    <meta
+      name="description"
+      content="Ribbon is an installable offline typing test. Practise WPM, accuracy, lessons and typing games with no internet connection. No ads, no sign-up, works on desktop, Android and iPhone."
+    />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://ribbon-typing-app.netlify.app/offline-typing-test" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#0B0C10" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="stylesheet" href="/seo.css" />
+
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Ribbon Typing Coach" />
+    <meta property="og:title" content="Offline Typing Test — Works Without Internet" />
+    <meta
+      property="og:description"
+      content="Install Ribbon as a progressive web app and keep practising typing offline — timed tests, 113 lessons, Dvorak and Colemak, arcade and bot races."
+    />
+    <meta property="og:url" content="https://ribbon-typing-app.netlify.app/offline-typing-test" />
+    <meta property="og:image" content="https://ribbon-typing-app.netlify.app/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ribbon-typing-app.netlify.app/" },
+        { "@type": "ListItem", "position": 2, "name": "Offline Typing Test", "item": "https://ribbon-typing-app.netlify.app/offline-typing-test" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "How to use the Ribbon typing test offline",
+      "totalTime": "PT2M",
+      "step": [
+        { "@type": "HowToStep", "name": "Open Ribbon in your browser", "text": "Visit the app once while you have an internet connection so the offline files are cached." },
+        { "@type": "HowToStep", "name": "Install it as an app", "text": "Use the Install button in your browser, or Add to Home Screen on a phone, to install Ribbon as a progressive web app." },
+        { "@type": "HowToStep", "name": "Go offline", "text": "Launch Ribbon from your home screen or app list. Timed tests, lessons and games continue to work with no connection." },
+        { "@type": "HowToStep", "name": "Keep your progress", "text": "Results and streaks are stored on your device, so they are still there the next time you open the app." }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Does the typing test work without internet?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Ribbon is a progressive web app. After you have opened it once online, the core app is cached and can be installed so it runs offline for timed tests, lessons, layouts and typing games." }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I install the offline typing test on Android?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Open Ribbon in Chrome or Edge and use the Install option in the browser menu, or Add to Home Screen. It then launches fullscreen from your home screen like a native app." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I install it on an iPhone or iPad?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Open Ribbon in Safari, tap Share, then choose Add to Home Screen. The app then opens fullscreen and works offline for the built-in practice content." }
+        },
+        {
+          "@type": "Question",
+          "name": "Which features need a connection?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Everything built into the coach works offline: timed WPM tests, the 113 lessons, Dvorak and Colemak, exam mode, arcade and bot races. Only optional AI-generated stories and the shared leaderboard need a connection." }
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="/" aria-label="Ribbon Typing Coach home">
+          <span class="logo">Ribbon</span>
+          <span class="tag">Free Typing Test</span>
+        </a>
+        <nav class="site-nav" aria-label="Typing guides">
+          <a href="/">Home</a>
+          <a href="/typing-practice-for-beginners">Beginners</a>
+          <a href="/offline-typing-test">Offline</a>
+          <a href="/typing-games">Typing games</a>
+          <a href="/ad-free-typing-test">Ad-free</a>
+        </nav>
+        <a class="cta" href="/app?start=test">Open the App</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="wrap inner">
+          <p class="eyebrow">Installable · Works offline · No sign-up</p>
+          <h1>Offline Typing Test — <span class="accent">Practice Without Internet</span></h1>
+          <p class="lede">
+            Flaky Wi-Fi, a commute with no signal, a school computer lab with restricted access, or
+            a low-data plan — none of them should stop you practising. Ribbon is a progressive web
+            app, so you can install it once and keep typing offline.
+          </p>
+          <div class="hero-actions">
+            <a class="cta" href="/app?start=test">Open &amp; install the coach</a>
+            <a class="ghost" href="/typing-practice-for-beginners">Beginner lessons</a>
+          </div>
+        </div>
+      </section>
+
+      <div class="wrap">
+        <p class="breadcrumb"><a href="/">Home</a> › Offline Typing Test</p>
+
+        <section>
+          <h2>What "offline typing test" actually means here</h2>
+          <p>
+            A normal web page stops working the moment your connection drops, because every screen
+            has to be fetched from a server. A <strong>progressive web app (PWA)</strong> installs
+            the app shell and its practice content onto your device, so the same page keeps running
+            with no network. Ribbon is built this way on purpose: practice should never depend on a
+            round trip to a server.
+          </p>
+          <div class="grid two">
+            <div class="card">
+              <h3>Install once, use anywhere</h3>
+              <p>Add Ribbon to your home screen or app list and launch it fullscreen, with no browser chrome and no address bar.</p>
+            </div>
+            <div class="card">
+              <h3>Practice content is bundled</h3>
+              <p>The 113 lessons, paragraphs, code snippets and exam passages ship with the app, so they do not need to be downloaded per session.</p>
+            </div>
+            <div class="card">
+              <h3>Progress stays on device</h3>
+              <p>Your WPM history, streaks and achievements live in local storage, so they survive going offline and coming back.</p>
+            </div>
+            <div class="card">
+              <h3>No account, no sync required</h3>
+              <p>There is nothing to log in to, so offline mode is not a degraded mode — it is the full app.</p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>How to install the offline typing test</h2>
+          <ol class="steps">
+            <li><strong>Open Ribbon once while online.</strong> This caches the app shell so it is available offline.</li>
+            <li><strong>Install it.</strong> On desktop Chrome or Edge, use the Install icon in the address bar. On Android, choose "Install app" or "Add to Home Screen". On iPhone, open in Safari, tap Share, then "Add to Home Screen".</li>
+            <li><strong>Launch from your home screen.</strong> It opens fullscreen like a native app — no browser toolbar competing for space.</li>
+            <li><strong>Type with no connection.</strong> Timed tests, lessons, layouts, exam mode and games all keep working.</li>
+          </ol>
+        </section>
+
+        <section>
+          <h2>What works offline vs what needs a connection</h2>
+          <table>
+            <thead>
+              <tr><th>Feature</th><th>Offline</th><th>Needs internet</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>60-second WPM &amp; accuracy test</td><td>Yes</td><td>—</td></tr>
+              <tr><td>113 guided lessons &amp; paragraphs</td><td>Yes</td><td>—</td></tr>
+              <tr><td>Hindi exam passages &amp; exam mode</td><td>Yes</td><td>—</td></tr>
+              <tr><td>Dvorak / Colemak layouts</td><td>Yes</td><td>—</td></tr>
+              <tr><td>Arcade, bot races &amp; weekly challenge</td><td>Yes (built-in)</td><td>Shared leaderboard only</td></tr>
+              <tr><td>AI-generated story or drill</td><td>No</td><td>Yes</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section>
+          <h2>When an offline typing coach is genuinely useful</h2>
+          <ul>
+            <li><strong>Exam preparation on the move.</strong> Practise Hindi or English passages on a laptop or tablet during a commute with no data.</li>
+            <li><strong>Schools and libraries.</strong> Restricted or monitored networks often block external tools; an installed app sidesteps that.</li>
+            <li><strong>Low-data connections.</strong> After the first load, practice costs nothing in bandwidth.</li>
+            <li><strong>Focus sessions.</strong> An installed app with no address bar and no feed is easier to stay inside.</li>
+            <li><strong>Unreliable Wi-Fi.</strong> A dropped connection mid-test never interrupts a run.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Privacy is part of offline</h2>
+          <p>
+            An app that works offline also needs less of your data. Ribbon stores your statistics
+            locally, uses no advertising or tracking cookies, and asks for no account. Installing it
+            does not create a profile — it just puts the files on your device.
+          </p>
+          <div class="note">
+            <p>Already installed? Try turning off Wi-Fi and opening Ribbon from your home screen. Timed tests and lessons should start exactly as they do online.</p>
+          </div>
+        </section>
+
+        <section>
+          <h2>Frequently asked questions</h2>
+          <div class="faq">
+            <details open>
+              <summary>Does the typing test work without internet?</summary>
+              <p>Yes. Ribbon is a progressive web app. After you have opened it once online, the core app is cached and can be installed so it runs offline for timed tests, lessons, layouts and typing games.</p>
+            </details>
+            <details>
+              <summary>How do I install the offline typing test on Android?</summary>
+              <p>Open Ribbon in Chrome or Edge and use the Install option in the browser menu, or Add to Home Screen. It then launches fullscreen from your home screen like a native app.</p>
+            </details>
+            <details>
+              <summary>Can I install it on an iPhone or iPad?</summary>
+              <p>Yes. Open Ribbon in Safari, tap Share, then choose Add to Home Screen. The app then opens fullscreen and works offline for the built-in practice content.</p>
+            </details>
+            <details>
+              <summary>Which features need a connection?</summary>
+              <p>Everything built into the coach works offline: timed WPM tests, the 113 lessons, Dvorak and Colemak, exam mode, arcade and bot races. Only optional AI-generated stories and the shared leaderboard need a connection.</p>
+            </details>
+          </div>
+        </section>
+
+        <section>
+          <h2>Keep reading</h2>
+          <div class="related">
+            <a href="/ad-free-typing-test">Ad-free typing test</a>
+            <a href="/typing-practice-for-beginners">Typing practice for beginners</a>
+            <a href="/typing-games">Free typing games</a>
+            <a href="/">Free typing speed test</a>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <p>Ribbon Typing Coach is a free, ad-free typing practice app for improving your words-per-minute speed and accuracy. It is not affiliated with any typing certification body.</p>
+        <nav aria-label="Footer">
+          <a href="/">Home</a>
+          <a href="/ad-free-typing-test">Ad-free typing test</a>
+          <a href="/typing-practice-for-beginners">Beginner typing practice</a>
+          <a href="/offline-typing-test">Offline typing test</a>
+          <a href="/typing-games">Typing games</a>
+          <a href="/privacy.html" rel="nofollow">Privacy Policy</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

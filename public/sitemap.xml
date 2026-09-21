@@ -7,6 +7,30 @@
     <priority>1.0</priority>
   </url>
   <url>
+    <loc>https://ribbon-typing-app.netlify.app/ad-free-typing-test</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ribbon-typing-app.netlify.app/typing-practice-for-beginners</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ribbon-typing-app.netlify.app/offline-typing-test</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ribbon-typing-app.netlify.app/typing-games</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://ribbon-typing-app.netlify.app/privacy.html</loc>
     <lastmod>2026-09-14</lastmod>
     <changefreq>yearly</changefreq>

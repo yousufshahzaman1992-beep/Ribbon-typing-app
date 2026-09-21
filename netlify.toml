@@ -76,6 +76,33 @@
   to = "/.netlify/functions/app-shell"
   status = 200
 
+# ── Static SEO guide pages: serve each at its extensionless canonical URL
+#    (matching sitemap.xml and the page's own <link rel="canonical">) instead
+#    of letting Pretty URLs 301 to a trailing-slash variant. ──────────────────
+[[redirects]]
+  from = "/ad-free-typing-test"
+  to = "/ad-free-typing-test/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/typing-practice-for-beginners"
+  to = "/typing-practice-for-beginners/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/offline-typing-test"
+  to = "/offline-typing-test/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/typing-games"
+  to = "/typing-games/index.html"
+  status = 200
+  force = true
+
 # ── Anything not matched above is a genuine 404 ──────────────────────────────
 [[redirects]]
   from = "/*"
