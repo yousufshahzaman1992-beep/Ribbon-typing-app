@@ -55,6 +55,12 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/api/llm-status"
+  to = "/.netlify/functions/llm-status"
+  status = 200
+  force = true
+
 # ── Challenge share URLs get server-rendered social meta tags ─────────────────
 [[redirects]]
   from = "/*"
