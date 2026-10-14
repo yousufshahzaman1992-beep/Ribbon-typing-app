@@ -285,7 +285,7 @@ async function callProvider(
     method: "POST",
     headers,
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(90_000), // 90s timeout
+    signal: AbortSignal.timeout(25_000), // stay under Netlify's 30s function cap
   });
 
   // Read the raw body once so we can inspect it regardless of status code.
@@ -369,8 +369,10 @@ export async function generateStory(
   };
 
   const messages: ChatMessage[] = [systemMessage, userMessage];
-  // ~1500 words ≈ 2000 tokens; add 25% headroom
-  const maxTokens = Math.round(wordCount * 1.5);
+  // ~1 word ≈ 1.4 tokens of prose, plus a generous fixed buffer because
+  // reasoning models (e.g. Gemini Flash) count their thinking tokens toward
+  // max_tokens. Without the buffer the story is truncated to a few words.
+  const maxTokens = Math.round(wordCount * 1.6) + 2048;
 
   const result = await runProviderWaterfall(messages, 0.8, maxTokens);
   return trimToWordCount(result, wordCount);
