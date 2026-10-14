@@ -14,13 +14,14 @@ export default defineConfig(() => {
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || ''),
       'process.env.GEMINI_API_KEYS': JSON.stringify(process.env.GEMINI_API_KEYS || process.env.VITE_GEMINI_API_KEYS || ''),
+      'process.env.GEMINI_MODEL': JSON.stringify(process.env.GEMINI_MODEL || 'gemini-3.8-flash'),
       'process.env.CEREBRAS_API_KEY': JSON.stringify(process.env.CEREBRAS_API_KEY || process.env.VITE_CEREBRAS_API_KEY || ''),
       'process.env.CEREBRAS_MODEL': JSON.stringify(process.env.CEREBRAS_MODEL || 'gpt-oss-120b'),
       'process.env.GROQ_API_KEY': JSON.stringify(process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || ''),
-      'process.env.GROQ_MODEL': JSON.stringify(process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'),
+      'process.env.GROQ_MODEL': JSON.stringify(process.env.GROQ_MODEL || 'openai/gpt-oss-120b'),
       'process.env.OPENROUTER_API_KEY': JSON.stringify(process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || ''),
       'process.env.OPENROUTER_API_KEY_1': JSON.stringify(process.env.OPENROUTER_API_KEY_1 || process.env.VITE_OPENROUTER_API_KEY_1 || ''),
-      'process.env.OPENROUTER_MODEL': JSON.stringify(process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free'),
+      'process.env.OPENROUTER_MODEL': JSON.stringify(process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free'),
     },
     build: {
       chunkSizeWarningLimit: 2000,

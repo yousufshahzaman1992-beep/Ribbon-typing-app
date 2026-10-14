@@ -49,7 +49,7 @@ const PROVIDERS: ProviderConfig[] = [
     name: "Google AI Studio (Gemini Flash)",
     envVars: ["GEMINI_API_KEY", "GEMINI_API_KEY_1", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3", "GEMINI_API_KEYS"],
     endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-    model: "gemini-2.0-flash",
+    model: process.env.GEMINI_MODEL || "gemini-3.8-flash",
     dailyCap: 1500,
     rpm: 14, // use 14 to stay safely under 15 RPM
     extraHeaders: {
@@ -68,7 +68,7 @@ const PROVIDERS: ProviderConfig[] = [
     name: "Groq",
     envVars: ["GROQ_API_KEY", "GROQ_API_KEY_1", "GROQ_API_KEYS"],
     endpoint: "https://api.groq.com/openai/v1/chat/completions",
-    model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+    model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
     dailyCap: 85,
     rpm: 29, // 29 to stay under 30
   },
@@ -76,7 +76,7 @@ const PROVIDERS: ProviderConfig[] = [
     name: "OpenRouter",
     envVars: ["OPENROUTER_API_KEY", "OPENROUTER_API_KEY_1", "OPENROUTER_API_KEY_2", "OPENROUTER_API_KEYS"],
     endpoint: "https://openrouter.ai/api/v1/chat/completions",
-    model: process.env.OPENROUTER_MODEL || "google/gemini-2.0-flash-exp:free",
+    model: process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free",
     dailyCap: 50,
     rpm: 19, // 19 to stay under 20
     extraHeaders: {
