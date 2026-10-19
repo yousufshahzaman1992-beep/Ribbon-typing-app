@@ -6,6 +6,12 @@ import { createServer as createViteServer } from "vite";
 import sharp from "sharp";
 import { generateStory, generateText, getLLMProviderStatus } from "./src/lib/llmProvider";
 import {
+  buildSmartDrillFallback,
+  buildSmartDrillPrompt,
+  normalizeSmartDrillInput,
+  parseSmartDrillResponse,
+} from "./src/lib/smartDrill";
+import {
   insertScore,
   toLeaderboardResponse,
   seedLeaderboard,
@@ -15,6 +21,7 @@ import {
 import { buildScorecardSvg } from "./src/lib/ogCard";
 import { parseChallengeQuery } from "./src/lib/challenge";
 import { renderAppShell } from "./src/lib/appShell";
+import { GUIDE_SLUGS } from "./scripts/seo-config";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 dotenv.config();
@@ -57,87 +64,6 @@ app.use((req, res, next) => {
     return res.redirect(302, `/app?challenge=${encodeURIComponent(String(req.query.challenge))}`);
   }
   next();
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. Generate Story based on Topic
-// ─────────────────────────────────────────────────────────────────────────────
-app.post("/api/generate-story", async (req, res) => {
-  const { topic, duration, script } = req.body;
-  const isHindi = script === 'hindi';
-  const targetTopic =
-    topic && typeof topic === "string" ? topic.trim() : (isHindi ? "टंकण अभ्यास" : "typing practice");
-
-  // Calculate word count: ~60 WPM average typing speed
-  const WPM = 60;
-  const durationMinutes =
-    typeof duration === "number" && [2, 5, 10, 15].includes(duration)
-      ? duration
-      : 2;
-  const targetWords = WPM * durationMinutes;
-
-  console.log(
-    `[API] Generating story for topic: "${targetTopic}", duration: ${durationMinutes}min (~${targetWords} words) in ${isHindi ? 'Hindi' : 'English'}`
-  );
-
-  try {
-    const prompt = isHindi
-      ? `Topic: "${targetTopic}". Write flowing prose paragraphs in Devanagari script (Hindi language), use standard Hindi punctuation (like ।). No title, no headers, no bullet points, and do NOT write English words in Devanagari (write genuine Hindi text).`
-      : `Topic: "${targetTopic}". Write flowing prose paragraphs, use standard punctuation, clean fluent English. No title, no headers, no bullet points.`;
-
-    const story = await generateStory(prompt, targetWords, isHindi ? "Hindi (Devanagari script)" : "English");
-    return res.json({ story });
-  } catch (err: any) {
-    console.error("[API] Story generation failed — using fallback:", err.message);
-  }
-
-  // ── Fallback stories ──────────────────────────────────────────────────────
-  const topicLower = targetTopic.toLowerCase();
-
-  if (isHindi) {
-    const mockStoriesHindi: Record<string, string> = {
-      space: "गहरे अंतरिक्ष अन्वेषण कैप्सूल ने तारों से भरे अंधेरे में शांति से यात्रा की। पृथ्वी को पीछे मुड़कर देखने पर, यह पूर्ण स्याही के समुद्र में तैरते हुए एक छोटे, चमकते नीलम की तरह दिखाई देती थी। चारों ओर, ठंडे प्राचीन तारे टिमटिमा रहे थे। चालक दल जानता था कि उनका मिशन खतरनाक था, फिर भी उनका संकल्प लोहे की तरह मजबूत था। वे ब्रह्मांड में आगे बढ़ते गए।",
-      ocean: "समुद्र की लहरें धीरे-धीरे तट की सुनहरी रेत से टकरा रही थीं। पानी के भीतर जीवंत मूंगे की शाखाओं के बीच चमकीली चांदी जैसी मछलियों का एक झुंड घूम रहा था। ऊपर आसमान में, समुद्री बगुले ताजी हवा पर तैर रहे थे। शांतिपूर्ण ज्वार ने सुबह टहलने वालों के पदचिह्नों को धो दिया, जिससे तट साफ और शुद्ध रहा जैसे कि सूरज धीरे-धीरे ऊपर चढ़ रहा था।",
-      forest: "एक घुमावदार मिट्टी का रास्ता प्राचीन जंगल में ले गया जहां ऊंचे हरे देवदार के पेड़ पहरा दे रहे थे। नरम हरी काई ने जड़ों पर एक मोटी कालीन बना दी थी, जिससे जंगली जीवों के कदमों को राहत मिली। कुरकुरी सुबह की हवा में देवदार की सुइयों और गीली मिट्टी की सुखद गंध थी। पास में ही एक झरना खुशी से बह रहा था।",
-      magic: "छिपे हुए जादूगर के टॉवर के भीतर, एक भारी ओक की मेज पर एक धूल भरी जादुई किताब खुली पड़ी थी। रहस्यमयी बैंगनी अक्षरों ने एक नरम रोशनी के साथ स्पंदन किया, जिससे पत्थर के फर्श पर लंबी परछाइयां पड़ीं। पुराने जादूगर ने अपने हाथ में लकड़ी की छड़ी घुमाई और कमरे में एक सुनहरी तितली उड़ने लगी, जिससे चारों ओर आशा की किरण फैल गई।"
-    };
-    let foundStory = "";
-    for (const [key, text] of Object.entries(mockStoriesHindi)) {
-      if (topicLower.includes(key)) {
-        foundStory = text;
-        break;
-      }
-    }
-    if (!foundStory) {
-      foundStory = `एक अद्भुत यात्रा तब शुरू हुई जब एक जिज्ञासु यात्री ने ${targetTopic} पर केंद्रित एक नया मार्ग तलाशने का निर्णय लिया। आगे बढ़ने वाले हर एक कदम ने नई चुनौतियाँ और मूल्यवान अंतर्दृष्टि प्रदान की। यात्री ने महसूस किया कि दृढ़ता और समर्पण के साथ अभ्यास करना ही किसी भी कौशल में महारत हासिल करने का वास्तविक रहस्य है। शांत घंटों में उंगलियां कुंजीपटल पर चलती रहीं।`;
-    }
-    return res.json({ story: foundStory });
-  }
-
-  const mockStories: Record<string, string> = {
-    space:
-      "The deep space explorer capsule coasted quietly in the starry dark. Looking back at Earth, it appeared as a tiny, glowing sapphire floating in a sea of absolute ink. All around, cold ancient stars twinkled. The crew knew their mission was dangerous, yet their resolve was as strong as iron. They typed command sequences into the terminal, pushing further into the unknown cosmos.",
-    ocean:
-      "The ocean waves crashed gently upon the golden sands of the shore. A school of bright silver fish darted between the vibrant coral branches underwater. High above, seagulls drifted gracefully on the salt-scented wind, seeking their morning catch. The peaceful tide washed away footprints left by early beachcombers, keeping the coast clean and pure as the sun slowly climbed up the sky.",
-    forest:
-      "A winding dirt path led deep into the ancient forest where towering emerald pines stood guard. Soft green moss formed a thick carpet over the roots, cushioning the light footsteps of the forest creatures. The crisp morning air carried the pleasant smell of pine needles and damp earth. Somewhere nearby, a hidden brook bubbled merrily, winding its way through the tranquil wilderness.",
-    magic:
-      "Inside the hidden wizard tower, a dusty spellbook lay open on a heavy oak table. Mystical violet runes pulsed with a soft light, casting long shadows across the stone floor. The old wizard whispered a gentle chant, waving his wooden wand over a glass vial of starlight water. In an instant, a small golden butterfly made of pure stardust fluttered into the room, bringing a sense of hope.",
-  };
-
-  let foundStory = "";
-  for (const [key, text] of Object.entries(mockStories)) {
-    if (topicLower.includes(key)) {
-      foundStory = text;
-      break;
-    }
-  }
-
-  if (!foundStory) {
-    foundStory = `A remarkable journey began when a curious traveler decided to explore a new path centered around ${targetTopic}. Every single step forward brought fresh challenges and valuable insights. The traveler realized that practicing with persistence and dedication was the true secret to mastering any skill. In the quiet hours of the night, as keys clattered softly, progress was made. True craft is born from steady, deliberate effort, transforming the difficult into the second nature.`;
-  }
-
-  return res.json({ story: foundStory });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -275,39 +201,30 @@ app.post("/api/weekly-challenge", async (req, res) => {
 // 4. Smart Drill (fumbles + slow bigrams)
 // ─────────────────────────────────────────────────────────────────────────────
 app.post("/api/generate-smart-drill", async (req, res) => {
-  const { fumbles, bigrams, script } = req.body;
-  const targetScript = typeof script === "string" ? script : "english";
-  const isHindi = targetScript === "hindi";
-
-  const targetFumbles =
-    Array.isArray(fumbles) && fumbles.length > 0
-      ? fumbles.join(", ")
-      : (isHindi ? "क, र, त" : "z, q, b");
-  const targetBigrams =
-    Array.isArray(bigrams) && bigrams.length > 0
-      ? bigrams.join(", ")
-      : (isHindi ? "कर, तर" : "th, er, ou");
+  const input = normalizeSmartDrillInput(req.body);
+  const { fumbles, bigrams, weakestFinger, script } = input;
 
   console.log(
-    `[API] Generating smart drill for fumbles: "${targetFumbles}", bigrams: "${targetBigrams}" in ${targetScript}`
+    `[API] Generating smart drill for fumbles: "${fumbles.join(", ")}", bigrams: "${bigrams.join(", ")}", ` +
+      `weakest finger: "${weakestFinger ?? "n/a"}" in ${script}`
   );
 
   try {
-    const prompt = isHindi
-      ? `Generate a focused typing drill in Hindi (Devanagari script) based on these Devanagari characters: "${targetFumbles}" and "${targetBigrams}". The drill must be an engaging, cohesive paragraph of exactly 70 to 100 words in standard, fluent Hindi. It should heavily feature words that use these characters. Return ONLY the raw Devanagari text. No titles, formatting, markdown, quotes, or introduction.`
-      : `Generate a focused typing drill for fumbles: "${targetFumbles}" and bigrams: "${targetBigrams}". The drill must be an engaging, cohesive story of exactly 100 words in standard, fluent English. It should heavily feature words that use these characters and letter combinations. IMPORTANT: Return ONLY the raw text. No titles, formatting, markdown, quotes, or introduction.`;
-
-    const drill = await generateText(prompt);
-    if (drill) return res.json({ drill });
+    const prompt = buildSmartDrillPrompt(input);
+    const raw = await generateText(prompt);
+    const drills = parseSmartDrillResponse(raw, input);
+    return res.json({ drills, fumbles, bigrams, weakestFinger, script });
   } catch (err: any) {
     console.error("[API] Smart drill generation failed — using fallback:", err.message);
   }
 
-  const fallbackDrill = isHindi
-    ? "एक छोटा चूहा जंगल में दौड़ रहा था। उसने पेड़ के नीचे एक चमकता हुआ हीरा देखा। उसने सोचा कि यह कोई मीठा फल है। जैसे ही उसने उसे छूने का प्रयास किया, एक बुद्धिमान कौआ उड़कर आया और बोला कि यह पत्थर है फल नहीं। चूहे ने कौवे की बात मानी और खुश होकर आगे बढ़ गया। निरंतर अभ्यास और सूझबूझ से हम अपनी सभी त्रुटियों को दूर कर सकते हैं और एक कुशल टंकक बन सकते हैं।"
-    : `The quick brown fox jumps over the lazy dog. Quickly, the brave explorer zipped up his jacket and began quiet adventures, solving mysteries that bothered him. Through thick forests and under ancient rivers, they found hidden paths, repeating their steps carefully to ensure they would never falter. Every single keystroke was precise, steady, and fast, bringing a sense of ultimate concentration and mastery. With persistence, any hurdle can be cleared, turning fumbles into fluent actions. Focus your mind, breathe quietly, and let your fingers dance across the keys in perfect rhythm and complete control.`;
-
-  return res.json({ drill: fallbackDrill });
+  return res.json({
+    drills: buildSmartDrillFallback(input),
+    fumbles,
+    bigrams,
+    weakestFinger,
+    script,
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -454,7 +371,19 @@ app.post("/api/reminders", (req, res) => {
 // 6. Vite / Static File Serving
 // ─────────────────────────────────────────────────────────────────────────────
 async function startServer() {
+  // Static SEO landing pages. Generated into public/<slug>/index.html by
+  // scripts/generate-seo-pages.ts and copied to dist/<slug>/index.html on build.
+  // Single source of truth shared with the sitemap/page generators.
+  const seoPages = GUIDE_SLUGS;
+
   if (process.env.NODE_ENV !== "production") {
+    // Serve the pre-rendered guides before Vite's SPA fallback in development.
+    const publicPath = path.join(process.cwd(), "public");
+    for (const slug of seoPages) {
+      app.get(`/${slug}`, (_req, res) => {
+        res.sendFile(path.join(publicPath, slug, "index.html"));
+      });
+    }
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -501,12 +430,6 @@ async function startServer() {
     // extensionless canonical URL (the same URL declared in its <link rel="
     // canonical"> and in sitemap.xml) with a 200, instead of letting
     // express.static 301 to a trailing-slash variant.
-    const seoPages = [
-      "ad-free-typing-test",
-      "typing-practice-for-beginners",
-      "offline-typing-test",
-      "typing-games",
-    ];
     for (const slug of seoPages) {
       app.get(`/${slug}`, (_req, res) => {
         res.sendFile(path.join(distPath, slug, "index.html"));

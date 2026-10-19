@@ -42,6 +42,7 @@
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Ribbon Typing Coach — free typing speed test with WPM and accuracy" />
     <meta property="og:locale" content="en_US" />
 
     <!-- Twitter -->
@@ -49,6 +50,7 @@
     <meta name="twitter:title" content="Free Typing Speed Test (WPM) &amp; Accuracy — 113 English, Hindi &amp; Code Lessons" />
     <meta name="twitter:description" content="Free typing speed test that measures WPM and accuracy in real time. Beginner typing practice with 113 lessons: English, Hindi (Devanagari), JavaScript code and medical drills." />
     <meta name="twitter:image" content="https://ribbon-typing-app.netlify.app/og-image.png" />
+    <meta name="twitter:image:alt" content="Ribbon Typing Coach — free typing speed test with WPM and accuracy" />
 
     <!-- Structured data -->
     <script type="application/ld+json">
@@ -62,6 +64,17 @@
       "browserRequirements": "Requires JavaScript",
       "description": "Free online typing speed test (WPM & accuracy) with English, Hindi and code typing practice, lessons, races, medical drills, weekly challenges, and leaderboards.",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": "https://ribbon-typing-app.netlify.app/#website",
+      "url": "https://ribbon-typing-app.netlify.app/",
+      "name": "Ribbon Typing Coach",
+      "description": "Free typing speed test and practice app with English, Hindi (Devanagari), code and medical typing lessons.",
+      "inLanguage": "en"
     }
     </script>
     <script type="application/ld+json">
@@ -104,6 +117,7 @@
     </script>
   </head>
   <body>
+    <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-amber-400 focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-[#0B0C10]">Skip to content</a>
     <div id="root">
       <div class="min-h-screen bg-[#0B0C10] text-zinc-100 font-sans antialiased selection:bg-amber-500/30">
 
@@ -128,7 +142,7 @@
         </header>
 
         <!-- ================= HERO ================= -->
-        <section class="relative overflow-hidden">
+        <section id="main" tabindex="-1" class="relative overflow-hidden">
           <div class="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,rgba(245,158,11,0.12),transparent_55%)]"></div>
           <div class="relative max-w-6xl mx-auto px-4 sm:px-6 pt-16 pb-14 text-center">
             <p class="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
@@ -479,14 +493,41 @@
         <!-- ================= FOOTER ================= -->
         <footer class="border-t border-zinc-800/60">
           <div class="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-6">
-            <div>
-              <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-amber-400">Typing guides</h2>
-              <nav aria-label="Typing guides" class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-400">
-                <a href="/ad-free-typing-test" class="hover:text-amber-400 transition-colors">Ad-free typing test</a>
-                <a href="/typing-practice-for-beginners" class="hover:text-amber-400 transition-colors">Typing practice for beginners</a>
-                <a href="/offline-typing-test" class="hover:text-amber-400 transition-colors">Offline typing test</a>
-                <a href="/typing-games" class="hover:text-amber-400 transition-colors">Free typing games</a>
-              </nav>
+            <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-amber-400">Typing basics</h2>
+                <nav aria-label="Typing basics" class="mt-3 flex flex-col items-start gap-2 text-sm text-zinc-400">
+                  <a href="/ad-free-typing-test" class="hover:text-amber-400 transition-colors">Ad-free typing test</a>
+                  <a href="/typing-practice-for-beginners" class="hover:text-amber-400 transition-colors">Typing practice for beginners</a>
+                  <a href="/offline-typing-test" class="hover:text-amber-400 transition-colors">Offline typing test</a>
+                  <a href="/typing-games" class="hover:text-amber-400 transition-colors">Free typing games</a>
+                </nav>
+              </div>
+              <div>
+                <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-amber-400">Exams &amp; Hindi</h2>
+                <nav aria-label="Exams and Hindi" class="mt-3 flex flex-col items-start gap-2 text-sm text-zinc-400">
+                  <a href="/hindi-typing-lessons" class="hover:text-amber-400 transition-colors">Hindi typing lessons</a>
+                  <a href="/ssc-chsl-hindi-typing-test" class="hover:text-amber-400 transition-colors">SSC CHSL Hindi test</a>
+                  <a href="/clerical-civil-exam-practice" class="hover:text-amber-400 transition-colors">Clerical &amp; civil exam practice</a>
+                </nav>
+              </div>
+              <div>
+                <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-amber-400">Programming</h2>
+                <nav aria-label="Programming" class="mt-3 flex flex-col items-start gap-2 text-sm text-zinc-400">
+                  <a href="/javascript-syntax-practice" class="hover:text-amber-400 transition-colors">JavaScript typing practice</a>
+                  <a href="/python-speed-test" class="hover:text-amber-400 transition-colors">Python speed test</a>
+                  <a href="/html-css-tag-drills" class="hover:text-amber-400 transition-colors">HTML &amp; CSS tag drills</a>
+                </nav>
+              </div>
+              <div>
+                <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-amber-400">Reading &amp; drills</h2>
+                <nav aria-label="Reading and drills" class="mt-3 flex flex-col items-start gap-2 text-sm text-zinc-400">
+                  <a href="/alice-in-wonderland" class="hover:text-amber-400 transition-colors">Alice in Wonderland practice</a>
+                  <a href="/sherlock-holmes-paragraphs" class="hover:text-amber-400 transition-colors">Sherlock Holmes paragraphs</a>
+                  <a href="/moby-dick-excerpts" class="hover:text-amber-400 transition-colors">Moby Dick excerpts</a>
+                  <a href="/medical-terminology-drills" class="hover:text-amber-400 transition-colors">Medical terminology drills</a>
+                </nav>
+              </div>
             </div>
             <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-zinc-800/60 pt-6">
               <p class="text-sm text-zinc-500">Ribbon Typing Coach is a free typing practice app for improving your words-per-minute speed and accuracy. It is not affiliated with any typing certification body.</p>

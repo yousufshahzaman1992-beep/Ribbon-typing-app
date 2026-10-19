@@ -62,7 +62,8 @@ import { LESSONS } from './data';
 import { STORIES_LIT1 } from './stories_lit1';
 import { PASSAGES } from './passages';
 import { Lesson, SessionHistoryItem } from './types';
-import { generateStory, generateText } from './lib/llmProvider';
+import { generateText } from './lib/llmProvider';
+import { getFingerForKey, formatFingerLabel, resolveKeyChar } from './lib/keyboardMap';
 import { buildChallengeUrl, parseChallengeQuery, type ChallengeData } from './lib/challenge';
 
 // Code-split the arcade hub so the mini-games load only when opened
@@ -554,7 +555,6 @@ export default function App() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState<boolean>(false);
   const [keyboardVisibleOnMobile, setKeyboardVisibleOnMobile] = useState<boolean>(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
-  const [aiStoryOpen, setAiStoryOpen] = useState<boolean>(false);
   const [weaknessOpen, setWeaknessOpen] = useState<boolean>(false);
   const [modesMenuOpen, setModesMenuOpen] = useState<boolean>(false);
   const [modesMenuPos, setModesMenuPos] = useState<{ top: number; left: number } | null>(null);
@@ -562,14 +562,12 @@ export default function App() {
   const [contentMenuPos, setContentMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [durationMenuOpen, setDurationMenuOpen] = useState<boolean>(false);
   const [durationMenuPos, setDurationMenuPos] = useState<{ top: number; left: number } | null>(null);
-  const [aiStoryPos, setAiStoryPos] = useState<{ top: number; left: number } | null>(null);
   const [moreMenuOpen, setMoreMenuOpen] = useState<boolean>(false);
   const [moreMenuPos, setMoreMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [modeStripScroll, setModeStripScroll] = useState<{ left: boolean; right: boolean }>({ left: false, right: false });
   const modesMenuBtnRef = useRef<HTMLButtonElement | null>(null);
   const contentMenuBtnRef = useRef<HTMLButtonElement | null>(null);
   const durationMenuBtnRef = useRef<HTMLButtonElement | null>(null);
-  const aiStoryBtnRef = useRef<HTMLButtonElement | null>(null);
   const moreMenuBtnRef = useRef<HTMLButtonElement | null>(null);
   const modeStripRef = useRef<HTMLDivElement | null>(null);
   const modeStripScrollStateRef = useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
@@ -1178,14 +1176,24 @@ export default function App() {
   const [timedEndModalOpen, setTimedEndModalOpen] = useState<boolean>(false);
 
   // AI-powered features states
-  const [storyTopic, setStoryTopic] = useState<string>("");
-  const [storyDuration, setStoryDuration] = useState<number>(2);
-  const [storyGenerating, setStoryGenerating] = useState<boolean>(false);
   const [weaknessBigram, setWeaknessBigram] = useState<string | null>(null);
   const [weaknessDelay, setWeaknessDelay] = useState<number | null>(null);
   const [weaknessSentence, setWeaknessSentence] = useState<string | null>(null);
   const [sentenceGenerating, setSentenceGenerating] = useState<boolean>(false);
   const keystrokeTimesRef = useRef<Array<{ key: string; ts: number }>>([]);
+
+  // Smart Drill queue refs mirror state so the completion effect can read the
+  // latest values without re-subscribing.
+  const smartDrillQueueRef = useRef<Lesson[]>([]);
+  const smartDrillQueueIndexRef = useRef<number>(0);
+  // Session-scoped baseline for before/after measurement (Task 2e).
+  const smartDrillSessionRef = useRef<{
+    targetedChars: string[];
+    targetedBigrams: string[];
+    baselinePresses: Record<string, number>;
+    baselineErrors: Record<string, number>;
+    priorRates: Record<string, number>;
+  } | null>(null);
 
   // Feature 1: Keystroke Dynamics tracking refs
   const keyDownTimesRef = useRef<Record<string, number>>({});
@@ -1285,6 +1293,14 @@ export default function App() {
 
   const [weeklyLeaderboard, setWeeklyLeaderboard] = useState<any[]>([]);
   const [smartDrillGenerating, setSmartDrillGenerating] = useState<boolean>(false);
+  // Structured (multi-part) Smart Drill playback queue (Task 2d)
+  const [smartDrillQueue, setSmartDrillQueue] = useState<Lesson[]>([]);
+  const [smartDrillQueueIndex, setSmartDrillQueueIndex] = useState<number>(0);
+  // End-of-queue before/after measurement result (Task 2e)
+  const [smartDrillResultMessage, setSmartDrillResultMessage] = useState<string | null>(null);
+  // Task 3: bumped whenever the weakness-trend history is cleared, so the
+  // trend panel re-renders without wiping any other user progress.
+  const [weaknessHistoryVersion, setWeaknessHistoryVersion] = useState<number>(0);
   const [focusBadgeEarned, setFocusBadgeEarned] = useState<boolean>(() => {
     if (typeof localStorage !== "undefined") {
       return localStorage.getItem("ribbon_focus_badge_earned") === "true";
@@ -1502,10 +1518,6 @@ export default function App() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const caretRef = useRef<HTMLDivElement | null>(null);
   const isAppendingRef = useRef<boolean>(false);
-  // AI story auto-append: tracks whether a background prefetch is already in flight
-  const aiPrefetchInFlightRef = useRef<boolean>(false);
-  // Tracks the targetText length at which the last prefetch was triggered (prevents double-firing)
-  const aiPrefetchTriggeredAtRef = useRef<number>(0);
 
   const getActiveContainer = (): HTMLDivElement | null => {
     if (containerRef.current && (containerRef.current.offsetParent !== null || containerRef.current.clientWidth > 0)) {
@@ -1595,76 +1607,6 @@ export default function App() {
       if (containerRef.current) containerRef.current.scrollTop = 0;
     });
   }, [derivedTargetText]);
-
-  // ── AI Story Auto-Append ────────────────────────────────────────────────────
-  // When the user is typing an AI story (lesson id 9999) and reaches 80% of the
-  // current text, silently fetch a new story chunk in the background and append
-  // it — so they never run out of text mid-session.
-  useEffect(() => {
-    // Only applies to AI stories
-    if (currentLesson.id !== 9999) return;
-    if (!targetText || targetText.length === 0) return;
-    if (workoutCompleted) return;
-    if (aiPrefetchInFlightRef.current) return;
-
-    const progress = typedText.length / targetText.length;
-
-    // Fire once per "generation cycle" — only when we cross 80% and haven't
-    // already triggered for this particular targetText length.
-    if (progress >= 0.80 && aiPrefetchTriggeredAtRef.current !== targetText.length) {
-      aiPrefetchTriggeredAtRef.current = targetText.length;
-      aiPrefetchInFlightRef.current = true;
-
-      const topic = storyTopic || 'typing practice';
-
-      let newChunk = "";
-      (async () => {
-        try {
-          const res = await fetch('/api/generate-story', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic, duration: storyDuration, script: currentScript }),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data && data.story) newChunk = data.story;
-          }
-        } catch (err) {
-          // fallback below
-        }
-
-        if (!newChunk) {
-          try {
-            newChunk = await generateStory(`Continue the typing story about "${topic}" in ${currentScript === 'hindi' ? 'Hindi' : 'English'}.`, 150);
-          } catch (e) {
-            console.warn('[AutoAppend] Fallback story prefetch failed:', e);
-          }
-        }
-
-        if (newChunk) {
-          const cleanExisting = (currentLessonRef.current.customText || '').replace(/\s+/g, ' ').trim();
-          const cleanNew = newChunk.replace(/\s+/g, ' ').trim();
-          const combinedText = cleanExisting + '\n\n' + cleanNew;
-
-          const mergedLesson: Lesson = {
-            ...currentLessonRef.current,
-            customText: combinedText,
-          };
-
-          isAppendingRef.current = true;
-          setCurrentLesson(mergedLesson);
-
-          const nextParsed = getLessonStructure(mergedLesson);
-          const nextFormatted = buildTargetTextFromStructure(nextParsed);
-          setTargetText(nextFormatted);
-        }
-      })().finally(() => {
-        aiPrefetchInFlightRef.current = false;
-        // If the prefetch failed entirely, allow a retry at the next threshold
-        if (!newChunk) aiPrefetchTriggeredAtRef.current = 0;
-      });
-    }
-  }, [typedText.length, targetText, currentLesson.id, workoutCompleted, storyTopic, storyDuration, getLessonStructure, buildTargetTextFromStructure]);
 
   // Keep refs of current values to avoid stale closures in clock setInterval and keyboard handlers
   const typedTextRef = useRef(typedText);
@@ -2539,7 +2481,6 @@ export default function App() {
     // Start timer on first keypress
     if (typedText.length === 0 && !startTime) {
       setStartTime(Date.now());
-      setAiStoryOpen(false);
     }
 
     if (key === 'Backspace') {
@@ -3180,69 +3121,6 @@ export default function App() {
     setPunishedTokenIndex(null);
   };
 
-  // Generate custom story from AI
-  const generateAIStory = async () => {
-    if (!storyTopic.trim()) return;
-    setStoryGenerating(true);
-    const activeDuration = testDuration ? Math.round(testDuration / 60) : storyDuration;
-    sfx.playClick();
-    try {
-      let storyText = "";
-      try {
-        const res = await fetch("/api/generate-story", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ topic: storyTopic, duration: activeDuration, script: currentScript }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.story) storyText = data.story;
-        }
-      } catch (e) {
-        console.warn("Server API unavailable, using client LLM fallback:", e);
-      }
-
-      // Client-side fallback if server API is unavailable (e.g. static host like Netlify)
-      if (!storyText) {
-        const langPrompt = currentScript === 'hindi'
-          ? `Write a clean, inspiring story in Hindi (Devanagari script) about "${storyTopic}". Target duration: ${activeDuration} minutes typing test (~${activeDuration * 40} words). Do NOT use special symbols, smart quotes, or dashes.`
-          : `Write an engaging typing practice story about "${storyTopic}". Target length: ~${activeDuration * 40} words. Use clean standard punctuation only.`;
-        storyText = await generateStory(langPrompt, activeDuration * 40);
-      }
-
-      if (storyText) {
-        const aiLesson: Lesson = {
-          id: 9999,
-          name: `🔮 AI Story: ${storyTopic} (${activeDuration}min)`,
-          keys: null,
-          desc: `${activeDuration}-minute AI story about "${storyTopic}"`,
-          customText: storyText
-        };
-        // Reset auto-append guards for the fresh session
-        aiPrefetchInFlightRef.current = false;
-        aiPrefetchTriggeredAtRef.current = 0;
-        setActiveAppMode('normal');
-        setCurrentLesson(aiLesson);
-        setTargetText(storyText.replace(/\s+/g, ' ').trim());
-        setTypedText("");
-        setStartTime(null);
-        setElapsed(0);
-        setWorkoutCompleted(false);
-        setWorkoutStats(null);
-        setTimedEndModalOpen(false);
-        keystrokeTimesRef.current = [];
-        setPunishedTokenIndex(null);
-        setAiStoryOpen(false); // Disappear on story generation
-      }
-    } catch (err) {
-      console.error("Failed to generate AI story:", err);
-    } finally {
-      setStoryGenerating(false);
-    }
-  };
-
   // Helper: Get current Monday UTC date as week id
   const getCurrentWeekId = (): string => {
     const d = new Date();
@@ -3501,55 +3379,312 @@ export default function App() {
     }
   };
 
-  // Function to generate a Smart Drill based on top fumbles and bigrams
+  const WEAKNESS_HISTORY_KEY = "ribbon_weakness_history";
+  const MIN_KEY_SAMPLES = 10;
+  const MIN_FINGER_SAMPLES = 20;
+
+  // Merge committed + currently-pending (unflushed) physical key counters so the
+  // analyzer always sees the freshest data without waiting for the throttle.
+  const getMergedKeyStats = (): { presses: Record<string, number>; errors: Record<string, number> } => {
+    const presses = { ...physicalKeyPresses };
+    const errors = { ...physicalKeyErrors };
+    for (const [k, v] of Object.entries(pendingStatsRef.current.physicalKeyPresses)) {
+      presses[k] = (presses[k] || 0) + v;
+    }
+    for (const [k, v] of Object.entries(pendingStatsRef.current.physicalKeyErrors)) {
+      errors[k] = (errors[k] || 0) + v;
+    }
+    return { presses, errors };
+  };
+
+  // Total presses/errors for a specific character, across all physical codes.
+  const getCharSample = (
+    char: string,
+    presses: Record<string, number>,
+    errors: Record<string, number>
+  ): { presses: number; errors: number } => {
+    let totalPresses = 0;
+    let totalErrors = 0;
+    for (const code of Object.keys(presses)) {
+      if (resolveKeyChar(code) === char) {
+        totalPresses += presses[code] || 0;
+        totalErrors += errors[code] || 0;
+      }
+    }
+    return { presses: totalPresses, errors: totalErrors };
+  };
+
+  // Task 2a: rank weak keys by ERROR RATE (errors / presses) rather than raw
+  // fumble counts, with a minimum-sample-size guard. Falls back to the legacy
+  // getTopFumbles() raw-count behaviour to fill any remaining slots.
+  const getTopWeakKeysByRate = (): { char: string; rate: number }[] => {
+    const { presses, errors } = getMergedKeyStats();
+
+    const candidates: { char: string; rate: number }[] = [];
+    const seen = new Set<string>();
+    for (const code of Object.keys(presses)) {
+      const char = resolveKeyChar(code);
+      if (!char || !/^[a-z]$/.test(char) || seen.has(char)) continue;
+      seen.add(char);
+      const total = presses[code] || 0;
+      if (total < MIN_KEY_SAMPLES) continue;
+      candidates.push({ char, rate: (errors[code] || 0) / total });
+    }
+
+    candidates.sort((a, b) => {
+      if (b.rate !== a.rate) return b.rate - a.rate;
+      // Tiebreak on raw fumble count
+      return (fumbles[b.char] || 0) - (fumbles[a.char] || 0);
+    });
+
+    const top = candidates.slice(0, 3);
+    if (top.length < 3) {
+      for (const f of getTopFumbles()) {
+        if (top.length >= 3) break;
+        if (!top.some((t) => t.char === f.char)) top.push({ char: f.char, rate: 0 });
+      }
+    }
+    return top;
+  };
+
+  // Task 2b: aggregate per-finger accuracy and return the weakest qualifying
+  // finger (with the same minimum-sample-size philosophy as 2a).
+  const getWeakestFinger = (): { finger: string; accuracy: number } | null => {
+    const { presses, errors } = getMergedKeyStats();
+
+    const agg: Record<string, { presses: number; errors: number }> = {};
+    for (const code of Object.keys(presses)) {
+      const finger = getFingerForKey(code);
+      if (!finger) continue;
+      if (!agg[finger]) agg[finger] = { presses: 0, errors: 0 };
+      agg[finger].presses += presses[code] || 0;
+      agg[finger].errors += errors[code] || 0;
+    }
+
+    let weakest: { finger: string; accuracy: number } | null = null;
+    for (const [finger, stats] of Object.entries(agg)) {
+      if (stats.presses < MIN_FINGER_SAMPLES) continue;
+      const accuracy = Math.round(((stats.presses - stats.errors) / stats.presses) * 100);
+      if (!weakest || accuracy < weakest.accuracy) {
+        weakest = { finger, accuracy };
+      }
+    }
+    return weakest;
+  };
+
+  const readWeaknessHistory = (): any[] => {
+    if (typeof localStorage === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(WEAKNESS_HISTORY_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  // Task 2c: append one weakness snapshot, keeping only the most recent 30.
+  const recordWeaknessSnapshot = () => {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const entry = {
+        date: new Date().toISOString(),
+        topFumbles: getTopWeakKeysByRate().map((f) => ({ char: f.char, rate: Math.round(f.rate * 1000) / 1000 })),
+        topBigrams: getTopSlowestBigrams().map((b) => ({ bigram: b.bigram, delay: b.delay })),
+        weakestFinger: getWeakestFinger(),
+      };
+      const history = readWeaknessHistory();
+      history.push(entry);
+      const trimmed = history.length > 30 ? history.slice(history.length - 30) : history;
+      localStorage.setItem(WEAKNESS_HISTORY_KEY, JSON.stringify(trimmed));
+    } catch (e) {
+      console.warn("Failed to record weakness snapshot:", e);
+    }
+  };
+
+  // Task 2c: simple trend — find a bigram present in both the oldest and the
+  // newest snapshot and report the delay change.
+  const getWeaknessTrend = (): { bigram: string; oldDelay: number; newDelay: number; sessions: number } | null => {
+    const history = readWeaknessHistory();
+    if (history.length < 2) return null;
+    const oldest = history[0];
+    const newest = history[history.length - 1];
+    const oldMap = new Map<string, number>(
+      (oldest?.topBigrams || []).map((b: any) => [b.bigram, b.delay])
+    );
+    for (const b of (newest?.topBigrams || [])) {
+      if (oldMap.has(b.bigram)) {
+        return { bigram: b.bigram, oldDelay: oldMap.get(b.bigram) as number, newDelay: b.delay, sessions: history.length };
+      }
+    }
+    return null;
+  };
+
+  // Task 3: dedicated control to reset ONLY the weakness trend history. Unlike
+  // "Wipe Telemetry" this leaves sessions, fumbles, XP and every other profile
+  // stat untouched, so the AI trend can be restarted independently.
+  const clearWeaknessHistory = () => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(WEAKNESS_HISTORY_KEY);
+      }
+      setSmartDrillResultMessage(null);
+      setWeaknessHistoryVersion((v) => v + 1);
+      sfx.playClick();
+      addToast('Weakness History Cleared', 'Trend data reset. Your progress is untouched.', 'info');
+    } catch (e) {
+      console.warn('Failed to clear weakness history:', e);
+    }
+  };
+
+  // Load a single queued Smart Drill part as the active session.
+  const loadSmartDrillLesson = (lesson: Lesson) => {
+    setActiveAppMode('normal');
+    setCurrentLesson(lesson);
+    setTargetText((lesson.customText || '').replace(/\s+/g, ' ').trim());
+    setTypedText("");
+    setStartTime(null);
+    setElapsed(0);
+    setWorkoutCompleted(false);
+    setWorkoutStats(null);
+    setTimedEndModalOpen(false);
+    setIsPaused(false);
+    keystrokeTimesRef.current = [];
+    setPunishedTokenIndex(null);
+  };
+
+  // Task 2e: when the LAST drill in the queue finishes, compare this session's
+  // accuracy for each targeted char against the prior baseline, then snapshot.
+  const finalizeSmartDrill = () => {
+    const session = smartDrillSessionRef.current;
+    if (session) {
+      const { presses: currentPresses, errors: currentErrors } = getMergedKeyStats();
+      const results: { char: string; before: number; after: number; delta: number }[] = [];
+
+      for (const char of session.targetedChars) {
+        const total = getCharSample(char, currentPresses, currentErrors);
+        const baseline = getCharSample(char, session.baselinePresses, session.baselineErrors);
+        const sessionPresses = total.presses - baseline.presses;
+        const sessionErrors = total.errors - baseline.errors;
+        if (sessionPresses < 3) continue;
+
+        const after = Math.round(((sessionPresses - sessionErrors) / sessionPresses) * 100);
+        const priorRate = session.priorRates[char];
+        const before = priorRate !== undefined ? Math.round((1 - priorRate) * 100) : null;
+        if (before === null) continue;
+        results.push({ char, before, after, delta: after - before });
+      }
+
+      results.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+      const top = results.slice(0, 3);
+      if (top.length > 0) {
+        const msg = top
+          .map((r) => `'${r.char}' ${r.before}% → ${r.after}%`)
+          .join(", ");
+        setSmartDrillResultMessage(`Drill cycle complete — ${msg}`);
+      } else {
+        setSmartDrillResultMessage(null);
+      }
+    }
+
+    // Fresh snapshot so the next trend calculation has current data.
+    recordWeaknessSnapshot();
+
+    smartDrillSessionRef.current = null;
+    smartDrillQueueRef.current = [];
+    smartDrillQueueIndexRef.current = 0;
+    setSmartDrillQueue([]);
+    setSmartDrillQueueIndex(0);
+  };
+
+  // Function to generate a Smart Drill from error-rate weak keys, slow bigrams
+  // and the weakest finger. Produces an ordered queue of structured drills (2d).
   const generateSmartDrill = async () => {
     setSmartDrillGenerating(true);
+    setSmartDrillResultMessage(null);
     sfx.playClick();
     try {
-      const fumblesArr = getTopFumbles().map(f => f.char);
-      const bigramsArr = getTopSlowestBigrams().map(b => b.bigram);
+      const weakKeys = getTopWeakKeysByRate();
+      const slowBigrams = getTopSlowestBigrams();
+      const weakestFinger = getWeakestFinger();
 
-      let drillText = "";
+      const fumblesPayload = weakKeys.map((f) => ({ char: f.char, rate: f.rate }));
+      const bigramsPayload = slowBigrams.map((b) => ({ bigram: b.bigram, delay: b.delay }));
+      const fumblesArr = weakKeys.map((f) => f.char);
+      const bigramsArr = slowBigrams.map((b) => b.bigram);
+
+      // Capture the PRIOR baseline (the most recent snapshot from before this
+      // session) so before/after measurement (2e) has something to compare to.
+      const history = readWeaknessHistory();
+      const priorEntry = history.length > 0 ? history[history.length - 1] : null;
+      const priorRates: Record<string, number> = {};
+      if (priorEntry && Array.isArray(priorEntry.topFumbles)) {
+        for (const f of priorEntry.topFumbles) {
+          if (f && typeof f.char === 'string' && typeof f.rate === 'number') priorRates[f.char] = f.rate;
+        }
+      }
+
+      // 2c: snapshot at the start so history exists even if generation fails.
+      recordWeaknessSnapshot();
+
+      const { presses: baselinePresses, errors: baselineErrors } = getMergedKeyStats();
+      smartDrillSessionRef.current = {
+        targetedChars: fumblesArr,
+        targetedBigrams: bigramsArr,
+        baselinePresses,
+        baselineErrors,
+        priorRates,
+      };
+
+      let drills: { label: string; text: string }[] = [];
       try {
         const res = await fetch("/api/generate-smart-drill", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fumbles: fumblesArr, bigrams: bigramsArr, script: currentScript })
+          body: JSON.stringify({ fumbles: fumblesPayload, bigrams: bigramsPayload, weakestFinger, script: currentScript }),
         });
         if (res.ok) {
           const data = await res.json();
-          if (data && data.drill) drillText = data.drill;
+          if (data && Array.isArray(data.drills) && data.drills.length > 0) {
+            drills = data.drills
+              .filter((d: any) => d && typeof d.text === 'string' && d.text.trim())
+              .map((d: any, i: number) => ({
+                label: typeof d.label === 'string' && d.label.trim() ? d.label : `Drill ${i + 1}`,
+                text: d.text,
+              }));
+          } else if (data && typeof data.drill === 'string' && data.drill.trim()) {
+            // Backward compatibility with the old single-string response shape.
+            drills = [{ label: 'Full sentence', text: data.drill }];
+          }
         }
       } catch (e) {
         console.warn("Smart drill server API unavailable, using fallback:", e);
       }
 
-      if (!drillText) {
+      if (drills.length === 0) {
         const prompt = currentScript === 'hindi'
           ? `Create a 40-word Hindi typing drill targeting key fumbles: [${fumblesArr.join(', ')}] and bigrams: [${bigramsArr.join(', ')}].`
           : `Create a 40-word English typing drill targeting key fumbles: [${fumblesArr.join(', ')}] and bigrams: [${bigramsArr.join(', ')}].`;
-        drillText = await generateText(prompt);
+        const drillText = await generateText(prompt);
+        if (drillText) drills = [{ label: 'Full sentence', text: drillText }];
       }
 
-      if (drillText) {
-        const drillLesson: Lesson = {
-          id: 8889,
-          name: "🧠 Smart Weakness Drill",
+      if (drills.length > 0) {
+        const lessons: Lesson[] = drills.map((d, i) => ({
+          id: 8889 + i,
+          name: `🧠 Smart Drill ${i + 1}/${drills.length}: ${d.label}`,
           keys: null,
-          desc: `Custom lesson targeting fumbles: ${fumblesArr.join(", ")} and bigrams: ${bigramsArr.join(", ")}`,
-          customText: drillText
-        };
-        setActiveAppMode('normal');
-        setCurrentLesson(drillLesson);
-        setTargetText(drillText.replace(/\s+/g, ' ').trim());
-        setTypedText("");
-        setStartTime(null);
-        setElapsed(0);
-        setWorkoutCompleted(false);
-        setWorkoutStats(null);
-        setTimedEndModalOpen(false);
-        keystrokeTimesRef.current = [];
-        setPunishedTokenIndex(null);
+          desc: `Part ${i + 1} (${d.label}) — targeting fumbles: ${fumblesArr.join(", ")} and bigrams: ${bigramsArr.join(", ")}`,
+          customText: d.text.trim(),
+        }));
+        smartDrillQueueRef.current = lessons;
+        smartDrillQueueIndexRef.current = 0;
+        setSmartDrillQueue(lessons);
+        setSmartDrillQueueIndex(0);
+        loadSmartDrillLesson(lessons[0]);
+      } else {
+        smartDrillSessionRef.current = null;
       }
     } catch (err) {
       console.error("Failed to generate Smart Drill:", err);
@@ -3557,6 +3692,29 @@ export default function App() {
       setSmartDrillGenerating(false);
     }
   };
+
+  // Task 2d/2e: advance through the Smart Drill queue on completion. Intermediate
+  // parts auto-play back-to-back; the final part triggers before/after measurement.
+  useEffect(() => {
+    if (!workoutCompleted) return;
+    const queue = smartDrillQueueRef.current;
+    if (!queue || queue.length === 0) return;
+    const idx = smartDrillQueueIndexRef.current;
+
+    if (idx < queue.length - 1) {
+      const nextIdx = idx + 1;
+      const timer = setTimeout(() => {
+        smartDrillQueueIndexRef.current = nextIdx;
+        setSmartDrillQueueIndex(nextIdx);
+        loadSmartDrillLesson(queue[nextIdx]);
+      }, 900);
+      return () => clearTimeout(timer);
+    }
+
+    const timer = setTimeout(() => finalizeSmartDrill(), 200);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workoutCompleted]);
 
   // Legacy arcade game loop has been removed to prevent background shield expiration from closing ArcadeHub.
 
@@ -4384,7 +4542,6 @@ export default function App() {
                       setDurationMenuPos({ top: r.bottom + 6, left: Math.min(r.left, window.innerWidth - 220) });
                       setModesMenuOpen(false);
                       setContentMenuOpen(false);
-                      setAiStoryOpen(false);
                     }
                     setDurationMenuOpen(o => !o);
                     sfx.playClick();
@@ -4431,28 +4588,6 @@ export default function App() {
                 }`}
               ><BookOpen className="w-3.5 h-3.5" /> Practice Stories</button>
 
-              {/* AI Story (opens in a popover instead of pushing controls inline) */}
-              <div className="relative inline-flex items-center shrink-0">
-                <button
-                  ref={aiStoryBtnRef}
-                  onClick={() => {
-                    if (!aiStoryOpen && aiStoryBtnRef.current) {
-                      const r = aiStoryBtnRef.current.getBoundingClientRect();
-                      setAiStoryPos({ top: r.bottom + 6, left: Math.min(r.left, window.innerWidth - 340) });
-                      setModesMenuOpen(false);
-                    }
-                    setAiStoryOpen(o => !o);
-                    sfx.playClick();
-                  }}
-                  data-mode-strip-active={aiStoryOpen}
-                  className={`px-2.5 py-1 text-[11px] font-mono rounded-xl border transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1 ${
-                    aiStoryOpen
-                      ? 'bg-[#F59E0B]/20 border-[#F59E0B]/70 text-[#F59E0B] font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.2)] scale-[1.02]'
-                      : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
-                  }`}
-                ><Sparkles className="w-3.5 h-3.5" /> AI Story {aiStoryOpen ? '▲' : '▼'}</button>
-              </div>
-
               {/* Gradient Divider */}
               <div className="w-px h-4 bg-gradient-to-b from-transparent via-zinc-700 to-transparent shrink-0 mx-1" />
 
@@ -4463,7 +4598,6 @@ export default function App() {
                   if (!modesMenuOpen && modesMenuBtnRef.current) {
                     const r = modesMenuBtnRef.current.getBoundingClientRect();
                     setModesMenuPos({ top: r.bottom + 6, left: Math.min(r.left, window.innerWidth - 220) });
-                    setAiStoryOpen(false);
                     setContentMenuOpen(false);
                   }
                   setModesMenuOpen(o => !o);
@@ -4498,7 +4632,6 @@ export default function App() {
                   if (!contentMenuOpen && contentMenuBtnRef.current) {
                     const r = contentMenuBtnRef.current.getBoundingClientRect();
                     setContentMenuPos({ top: r.bottom + 6, left: Math.min(r.left, window.innerWidth - 220) });
-                    setAiStoryOpen(false);
                     setModesMenuOpen(false);
                   }
                   setContentMenuOpen(o => !o);
@@ -4534,44 +4667,6 @@ export default function App() {
                 </>
               )}
             </div>
-
-            {/* AI Story popover (fixed-position so it isn't clipped by the strip's overflow) */}
-            {aiStoryOpen && aiStoryPos && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => { setAiStoryOpen(false); sfx.playClick(); }} />
-                <div
-                  className="fixed z-50 flex items-center gap-1.5 bg-[#0C0E18] border border-amber-500/40 p-2 rounded-xl shadow-2xl shadow-black/60"
-                  style={{ top: aiStoryPos.top, left: aiStoryPos.left }}
-                >
-                  <input
-                    type="text"
-                    placeholder="Enter topic (e.g. Cyberpunk)..."
-                    value={storyTopic}
-                    onChange={(e) => setStoryTopic(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && storyTopic.trim() && !storyGenerating) {
-                        generateAIStory();
-                      }
-                    }}
-                    autoFocus
-                    disabled={storyGenerating}
-                    className="bg-zinc-900 text-zinc-200 text-[11px] font-mono px-2.5 py-1 rounded-lg outline-none border border-zinc-800 focus:border-[#F59E0B] w-40 sm:w-52 placeholder:text-zinc-600 disabled:opacity-50"
-                  />
-                  <button
-                    onClick={generateAIStory}
-                    disabled={storyGenerating || !storyTopic.trim()}
-                    className="bg-[#F59E0B] hover:bg-[#F59E0B]/90 text-zinc-950 font-extrabold text-[11px] font-mono px-3 py-1 rounded-lg transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shadow-md active:scale-95"
-                  >
-                    {storyGenerating ? '...' : 'Generate'}
-                  </button>
-                  <button
-                    onClick={() => setAiStoryOpen(false)}
-                    className="text-zinc-500 hover:text-white text-[10px] px-1 cursor-pointer"
-                    title="Close"
-                  >✕</button>
-                </div>
-              </>
-            )}
 
             {/* Secondary modes dropdown (fixed-position) */}
             {modesMenuOpen && modesMenuPos && (
@@ -4909,13 +5004,25 @@ export default function App() {
                 </Suspense>
               ) : workoutCompleted ? (
                 /* WORKOUT COMPLETED */
+                (() => {
+                  const smartDrillHasRemaining = smartDrillQueue.length > 0 && smartDrillQueueIndex < smartDrillQueue.length - 1;
+                  return (
                 <div className="flex flex-col items-center justify-center text-center space-y-4 max-w-md w-full py-6 select-none animate-in fade-in zoom-in-95 duration-300">
                   <div className="w-14 h-14 bg-[#FFB800]/10 rounded-full flex items-center justify-center text-[#FFB800] border border-[#FFB800]/20 shadow-[0_0_20px_rgba(255,184,0,0.15)]">
                     <Award className="w-7 h-7 animate-bounce" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white tracking-tight">Lesson Success!</h3>
-                    <p className="text-xs text-zinc-500 mt-1 font-mono">Telemetry metrics synced to your analytics database</p>
+                    {smartDrillHasRemaining ? (
+                      <>
+                        <h3 className="text-lg font-bold text-white tracking-tight">Part complete</h3>
+                        <p className="text-xs text-zinc-500 mt-1 font-mono">Loading next drill part… ({smartDrillQueueIndex + 1}/{smartDrillQueue.length})</p>
+                      </>
+                    ) : (
+                      <>
+                        <h3 className="text-lg font-bold text-white tracking-tight">Lesson Success!</h3>
+                        <p className="text-xs text-zinc-500 mt-1 font-mono">Telemetry metrics synced to your analytics database</p>
+                      </>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 w-full my-2">
@@ -4933,6 +5040,7 @@ export default function App() {
                     </div>
                   </div>
 
+                  {!smartDrillHasRemaining && (
                   <div className="flex gap-3 w-full pt-1">
                     <button
                       onClick={handleResetSession}
@@ -4952,8 +5060,13 @@ export default function App() {
                       Next Stage
                     </button>
                   </div>
+                  )}
 
-                  {workoutStats && (
+                  {!smartDrillHasRemaining && smartDrillResultMessage && (
+                    <p className="text-[10px] font-mono text-emerald-300 font-bold">{smartDrillResultMessage}</p>
+                  )}
+
+                  {!smartDrillHasRemaining && workoutStats && (
                     <button
                       onClick={() => {
                         shareScore(workoutStats.wpm, workoutStats.accuracy, workoutStats.duration);
@@ -4966,6 +5079,8 @@ export default function App() {
                     </button>
                   )}
                 </div>
+                  );
+                })()
               ) : (
                 /* STANDARD ACTIVE TEXT AREA */
                 <div className="w-full h-full flex flex-col items-center justify-start overflow-hidden relative scroll-smooth">
@@ -5902,21 +6017,32 @@ export default function App() {
                             <p className="text-[10px] text-zinc-400 font-mono mt-0.5">Real-time telemetry breakdown & automated custom drill generator</p>
                           </div>
                         </div>
-                        <button
-                          onClick={() => {
-                            setActiveModal(null);
-                            generateSmartDrill();
-                          }}
-                          disabled={smartDrillGenerating}
-                          className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:opacity-50 text-zinc-950 font-black text-xs font-mono rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
-                        >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>{smartDrillGenerating ? "Generating Custom Drill..." : "Generate AI Weakness Drill"}</span>
-                        </button>
+                        <div className="flex items-center gap-2 w-full sm:w-auto sm:shrink-0">
+                          <button
+                            onClick={clearWeaknessHistory}
+                            disabled={readWeaknessHistory().length === 0}
+                            title="Reset weakness trend history only (keeps all other progress)"
+                            className="shrink-0 px-3 py-2 rounded-xl border border-zinc-700 hover:border-red-500/50 hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-400 font-mono font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Reset Trend</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActiveModal(null);
+                              generateSmartDrill();
+                            }}
+                            disabled={smartDrillGenerating}
+                            className="flex-1 sm:flex-none min-w-0 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:opacity-50 text-zinc-950 font-black text-xs font-mono rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 text-center leading-tight"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                            <span>{smartDrillGenerating ? "Generating Custom Drill..." : "Generate AI Weakness Drill"}</span>
+                          </button>
+                        </div>
                       </div>
 
                       {/* Detected Telemetry Metrics */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                         <div className="bg-[#141628]/90 p-3 rounded-xl border border-zinc-800/80 space-y-1">
                           <span className="text-[9px] font-mono text-zinc-400 uppercase font-black tracking-wider block">Target Key Fumbles</span>
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -5946,7 +6072,40 @@ export default function App() {
                             )}
                           </div>
                         </div>
+
+                        <div className="bg-[#141628]/90 p-3 rounded-xl border border-zinc-800/80 space-y-1">
+                          <span className="text-[9px] font-mono text-zinc-400 uppercase font-black tracking-wider block">Weakest Finger</span>
+                          {(() => {
+                            const wf = getWeakestFinger();
+                            if (!wf) {
+                              return <span className="text-[10px] font-mono text-emerald-400 italic">Need more keystroke data</span>;
+                            }
+                            return (
+                              <span className="inline-block px-2 py-0.5 bg-sky-500/15 border border-sky-500/30 text-sky-300 text-[10px] font-mono font-black rounded-lg">
+                                {formatFingerLabel(wf.finger)} ({wf.accuracy}% accuracy)
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </div>
+
+                      {/* Weakness trend (Task 2c) */}
+                      {(() => {
+                        void weaknessHistoryVersion;
+                        const trend = getWeaknessTrend();
+                        if (!trend) return null;
+                        return (
+                          <p className="text-[10px] font-mono text-zinc-400 pt-1">
+                            '{trend.bigram}' delay:{' '}
+                            <span className="text-amber-300 font-bold">{trend.oldDelay}ms → {trend.newDelay}ms</span>{' '}
+                            over your last {trend.sessions} sessions
+                          </p>
+                        );
+                      })()}
+
+                      {smartDrillResultMessage && (
+                        <p className="text-[10px] font-mono text-emerald-300 font-bold pt-1">{smartDrillResultMessage}</p>
+                      )}
                     </div>
 
                     {/* SVG speed velocity line graph (DYNAMIC) */}

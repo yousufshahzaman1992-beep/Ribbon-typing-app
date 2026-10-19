@@ -1,34 +1,52 @@
 import { generateText } from '../../src/lib/llmProvider';
+import {
+  buildSmartDrillFallback,
+  buildSmartDrillPrompt,
+  normalizeSmartDrillInput,
+  parseSmartDrillResponse,
+  type SmartDrillInput,
+} from '../../src/lib/smartDrill';
+
+function json(statusCode: number, payload: unknown) {
+  return {
+    statusCode,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  };
+}
 
 export async function handler(event: any) {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
+  let input: SmartDrillInput | null = null;
   try {
-    const { fumbles = [], bigrams = [], script = 'english' } = JSON.parse(event.body || '{}');
+    const body = JSON.parse(event.body || '{}');
+    input = normalizeSmartDrillInput(body);
 
-    const fumblesStr = Array.isArray(fumbles) ? fumbles.join(', ') : '';
-    const bigramsStr = Array.isArray(bigrams) ? bigrams.join(', ') : '';
+    const prompt = buildSmartDrillPrompt(input);
+    const raw = await generateText(prompt);
+    const drills = parseSmartDrillResponse(raw, input);
 
-    let prompt = "";
-    if (script === 'hindi') {
-      prompt = `Create a 40-word Hindi typing drill (Devanagari script) targeting key fumbles: [${fumblesStr}] and slow bigrams: [${bigramsStr}]. Output ONLY the raw drill text.`;
-    } else {
-      prompt = `Create a 40-word English typing drill targeting key fumbles: [${fumblesStr}] and slow bigrams: [${bigramsStr}]. Output ONLY the raw drill text.`;
-    }
-
-    const drill = await generateText(prompt);
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ drill, fumbles, bigrams, script }),
-    };
+    return json(200, {
+      drills,
+      fumbles: input.fumbles,
+      bigrams: input.bigrams,
+      weakestFinger: input.weakestFinger,
+      script: input.script,
+    });
   } catch (err: any) {
-    console.error('[Netlify Function generate-smart-drill Error]:', err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: err.message || 'Failed to generate smart drill' }),
-    };
+    console.error('[Netlify Function generate-smart-drill Error]:', err?.message || err);
   }
+
+  // Never leave the client empty-handed: return deterministic drills on failure.
+  const fallbackInput = input ?? normalizeSmartDrillInput({});
+  return json(200, {
+    drills: buildSmartDrillFallback(fallbackInput),
+    fumbles: fallbackInput.fumbles,
+    bigrams: fallbackInput.bigrams,
+    weakestFinger: fallbackInput.weakestFinger,
+    script: fallbackInput.script,
+  });
 }
